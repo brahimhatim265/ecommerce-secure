@@ -1,0 +1,42 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: payment-service
+  datasource:
+    url: jdbc:h2:mem:paymentsdb;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+    show-sql: false
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+payment:
+  simulation:
+    random:
+      # Optional: when set, tok_random draws are reproducible (same sequence at every startup).
+      seed: ${PAYMENT_RANDOM_SEED:}
+      # Integers >= 0 with a sum > 0; they are normalized, they do not have to add up to 100.
+      weights:
+        success: ${PAYMENT_WEIGHT_SUCCESS:60}
+        insufficient-funds: ${PAYMENT_WEIGHT_INSUFFICIENT_FUNDS:20}
+        card-declined: ${PAYMENT_WEIGHT_CARD_DECLINED:10}
+        expired-card: ${PAYMENT_WEIGHT_EXPIRED_CARD:10}
