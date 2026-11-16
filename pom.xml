@@ -22,6 +22,7 @@
         <module>user-service</module>
         <module>order-service</module>
         <module>payment-service</module>
+        <module>authorization-server</module>
     </modules>
 
     <properties>

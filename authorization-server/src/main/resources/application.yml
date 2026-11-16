@@ -1,0 +1,37 @@
+# Authorization server, step 1.
+# WARNING: the JWT signing keys are generated IN MEMORY at startup.
+# They change at every restart: tokens issued before a restart become invalid.
+#
+# The client and the user below are PROVISIONAL: they only exist so the server
+# can start. They are replaced by a real public client (step 2) and by
+# authentication through user-service (step 3).
+
+server:
+  port: 9000
+
+spring:
+  application:
+    name: authorization-server
+  security:
+    # PROVISIONAL user (replaced at step 3). Dummy password, override with the env variable.
+    user:
+      name: provisional-user
+      password: ${PROVISIONAL_USER_PASSWORD:change-me-provisional-password}
+    oauth2:
+      authorizationserver:
+        # Fixed issuer: every service must trust exactly this value (localhost != 127.0.0.1).
+        issuer: http://localhost:9000
+        client:
+          # PROVISIONAL client (replaced at step 2). Dummy secret, override with the env variable.
+          provisional-client:
+            registration:
+              client-id: provisional-client
+              client-secret: "{noop}${PROVISIONAL_CLIENT_SECRET:change-me-provisional-secret}"
+              client-authentication-methods:
+                - client_secret_basic
+              authorization-grant-types:
+                - authorization_code
+              redirect-uris:
+                - http://127.0.0.1:8080/login/oauth2/code/provisional-client
+              scopes:
+                - openid

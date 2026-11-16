@@ -194,6 +194,21 @@ Codes : 400 validation / JSON illisible / propriété inconnue / UUID malformé 
   relais de jeton. Les rôles (`CUSTOMER`, `ADMIN`) existent déjà dans l'identité vérifiée.
 * Nouveau module : ajouter un `<module>` au `pom.xml` parent ; les versions sont centralisées (`dependencyManagement`).
 
+## Module `authorization-server` (étape 1)
+
+Serveur d'autorisation OAuth 2.0 / OpenID Connect (Spring Authorization Server) qui émettra les jetons JWT du projet. Il démarre sur le port **9000** et son émetteur (issuer) est fixé à `http://localhost:9000`.
+
+Lancement : exécuter `AuthorizationServerApplication` depuis IntelliJ, ou `./mvnw -pl authorization-server spring-boot:run` (sous Windows : `mvnw.cmd -pl authorization-server spring-boot:run`).
+
+Deux URL à tester une fois le serveur démarré :
+
+- `http://localhost:9000/.well-known/openid-configuration` : document de découverte OIDC (contient `issuer`, `authorization_endpoint`, `token_endpoint`, `jwks_uri`) ;
+- `http://localhost:9000/oauth2/jwks` : clés publiques de signature (aucune clé privée n'est exposée).
+
+**Avertissement** : les clés de signature sont générées **en mémoire** au démarrage. Elles changent à chaque redémarrage, ce qui invalide tous les jetons déjà émis.
+
+**Provisoire** : le client OAuth2 (`provisional-client`) et l'utilisateur (`provisional-user`) déclarés dans `application.yml` n'existent que pour permettre le démarrage. Ils seront remplacés par un vrai client public avec PKCE (étape 2) puis par l'authentification via `user-service` (étape 3). Leurs secrets sont factices et surchargeables par les variables d'environnement `PROVISIONAL_CLIENT_SECRET` et `PROVISIONAL_USER_PASSWORD`.
+
 ## Import dans IntelliJ IDEA
 1. File > Open, puis sélectionner le fichier `pom.xml` à la racine (dossier `ecommerce-secure`) et choisir « Open as Project ».
 2. Attendre l'import Maven, avec un JDK 17 ou plus (File > Project Structure > SDK).
