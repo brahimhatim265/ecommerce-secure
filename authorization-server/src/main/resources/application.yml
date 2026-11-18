@@ -1,10 +1,9 @@
-# Authorization server, step 1.
+# Authorization server, step 3.
 # WARNING: the JWT signing keys are generated IN MEMORY at startup.
 # They change at every restart: tokens issued before a restart become invalid.
 #
-# The client and the user below are PROVISIONAL: they only exist so the server
-# can start. They are replaced by a real public client (step 2) and by
-# authentication through user-service (step 3).
+# Users are authenticated by user-service (see UserServiceAuthenticationProvider):
+# this server has no user store of its own.
 
 server:
   port: 9000
@@ -13,25 +12,35 @@ spring:
   application:
     name: authorization-server
   security:
-    # PROVISIONAL user (replaced at step 3). Dummy password, override with the env variable.
-    user:
-      name: provisional-user
-      password: ${PROVISIONAL_USER_PASSWORD:change-me-provisional-password}
     oauth2:
       authorizationserver:
         # Fixed issuer: every service must trust exactly this value (localhost != 127.0.0.1).
         issuer: http://localhost:9000
         client:
-          # PROVISIONAL client (replaced at step 2). Dummy secret, override with the env variable.
-          provisional-client:
+          # Public client (the future web shop): no secret, Authorization Code + PKCE only.
+          ecommerce-web:
             registration:
-              client-id: provisional-client
-              client-secret: "{noop}${PROVISIONAL_CLIENT_SECRET:change-me-provisional-secret}"
+              client-id: ecommerce-web
+              client-name: E-commerce web shop
               client-authentication-methods:
-                - client_secret_basic
+                - none
               authorization-grant-types:
                 - authorization_code
+              # Redirect URIs must match EXACTLY. 127.0.0.1 is used on purpose (not localhost).
               redirect-uris:
-                - http://127.0.0.1:8080/login/oauth2/code/provisional-client
+                - http://127.0.0.1:8080/authorized
+                - https://oauth.pstmn.io/v1/callback
               scopes:
                 - openid
+                - profile
+                - email
+            # PKCE is mandatory for this public client.
+            require-proof-key: true
+            # First-party application: no consent screen shown to the user.
+            require-authorization-consent: false
+            token:
+              access-token-time-to-live: PT15M
+
+services:
+  user:
+    base-url: ${USER_SERVICE_URL:http://localhost:8081}

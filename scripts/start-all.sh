@@ -27,6 +27,8 @@ start() {
 
 start user-service
 sleep "$DELAY_SECONDS"
+start authorization-server
+sleep "$DELAY_SECONDS"
 start payment-service
 sleep "$DELAY_SECONDS"
 start order-service
@@ -35,4 +37,5 @@ echo "All services launched (logs in $LOG_DIR)."
 echo "  user-service    : http://localhost:8081/swagger-ui.html"
 echo "  order-service   : http://localhost:8082/swagger-ui.html"
 echo "  payment-service : http://localhost:8083/swagger-ui.html"
+echo "  authorization-server : http://localhost:9000/.well-known/openid-configuration"
 wait

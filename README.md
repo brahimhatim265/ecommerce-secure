@@ -45,7 +45,7 @@ Une carte refusée est un **résultat métier normal** : `201` avec `status = PA
 
 ```bash
 ./mvnw clean verify                      # compile + tous les tests des 3 modules
-./scripts/start-all.sh                   # Linux/macOS : lance user → payment → order
+./scripts/start-all.sh                   # Linux/macOS : lance user → authorization → payment → order
 scripts\start-all.bat                    # Windows
 # ou service par service, dans 3 terminaux :
 ./mvnw -pl user-service spring-boot:run
@@ -194,32 +194,52 @@ Codes : 400 validation / JSON illisible / propriété inconnue / UUID malformé 
   relais de jeton. Les rôles (`CUSTOMER`, `ADMIN`) existent déjà dans l'identité vérifiée.
 * Nouveau module : ajouter un `<module>` au `pom.xml` parent ; les versions sont centralisées (`dependencyManagement`).
 
-## Module `authorization-server` (étape 1)
+## Module `authorization-server` (étapes 1 à 3)
 
-Serveur d'autorisation OAuth 2.0 / OpenID Connect (Spring Authorization Server) qui émettra les jetons JWT du projet. Il démarre sur le port **9000** et son émetteur (issuer) est fixé à `http://localhost:9000`.
+Serveur d'autorisation OAuth 2.0 / OpenID Connect (Spring Authorization Server) qui émet les jetons JWT du projet. Il démarre sur le port **9000** et son émetteur (issuer) est fixé à `http://localhost:9000`.
 
-Lancement : exécuter `AuthorizationServerApplication` depuis IntelliJ, ou `./mvnw -pl authorization-server spring-boot:run` (sous Windows : `mvnw.cmd -pl authorization-server spring-boot:run`).
+Lancement : `user-service` doit déjà tourner (port 8081). Ensuite, exécuter `AuthorizationServerApplication` depuis IntelliJ, ou `./mvnw -pl authorization-server spring-boot:run` (sous Windows : `mvnw.cmd -pl authorization-server spring-boot:run`). Ou lancer `scripts/start-all.*`, qui respecte l'ordre.
 
-Deux URL à tester une fois le serveur démarré :
+### Authentification (étape 3)
 
-- `http://localhost:9000/.well-known/openid-configuration` : document de découverte OIDC (contient `issuer`, `authorization_endpoint`, `token_endpoint`, `jwks_uri`) ;
-- `http://localhost:9000/oauth2/jwks` : clés publiques de signature (aucune clé privée n'est exposée).
+Ce serveur n'a **aucune base d'utilisateurs**. À la page de connexion, la personne saisit son **email** (dans le champ « Username », nom imposé par Spring Security) et son mot de passe. Le serveur les transmet à `user-service` (`POST /internal/auth/verify`), qui reste seul à détenir les mots de passe hachés : le hash ne quitte jamais `user-service`. L'adresse de `user-service` se règle avec la variable `USER_SERVICE_URL` (défaut `http://localhost:8081`).
 
-**Avertissement** : les clés de signature sont générées **en mémoire** au démarrage. Elles changent à chaque redémarrage, ce qui invalide tous les jetons déjà émis.
+| Réponse de `user-service` | Résultat de la connexion |
+|---|---|
+| 200 | Connexion réussie, le flux Authorization Code continue |
+| 401 (mauvais mot de passe ou email inconnu) | Retour à la page de connexion, message générique identique dans les deux cas |
+| 403 (compte désactivé) | Retour à la page de connexion, message générique, aucun token |
+| Panne (délai dépassé, service arrêté, erreur 5xx, réponse illisible) | Retour à la page de connexion, message générique, aucun token ; le serveur reste actif |
 
-**Provisoire** : le client OAuth2 (`provisional-client`) et l'utilisateur (`provisional-user`) déclarés dans `application.yml` n'existent que pour permettre le démarrage. Ils seront remplacés par un vrai client public avec PKCE (étape 2) puis par l'authentification via `user-service` (étape 3). Leurs secrets sont factices et surchargeables par les variables d'environnement `PROVISIONAL_CLIENT_SECRET` et `PROVISIONAL_USER_PASSWORD`.
+La connexion **échoue fermée** : au moindre doute, aucun token n'est émis. Les échecs sont journalisés en `WARN` avec l'email masqué (`h***@example.com`) et la raison interne, jamais le mot de passe. Le `sub` du token est l'**UUID** de l'utilisateur.
 
-## Import dans IntelliJ IDEA
-1. File > Open, puis sélectionner le fichier `pom.xml` à la racine (dossier `ecommerce-secure`) et choisir « Open as Project ».
-2. Attendre l'import Maven, avec un JDK 17 ou plus (File > Project Structure > SDK).
-3. Lancer les classes `UserApplication`, `PaymentApplication` puis `OrderApplication`, dans cet ordre.
+### URL utiles
 
-## Limites connues
-* Pas de vérification d'email ; l'email est immuable.
-* Pas de changement ni de réinitialisation de mot de passe.
-* Pas de limitation des tentatives de connexion.
-* Paiements simulés (aucun vrai prestataire) ; pas de remboursement.
-* Aucune protection d'accès : c'est l'objet de la suite du projet.
+- `http://localhost:9000/.well-known/openid-configuration` : document de découverte OIDC ;
+- `http://localhost:9000/oauth2/jwks` : clés publiques de signature (aucune clé privée n'est exposée) ;
+- `http://localhost:9000/oauth2/authorize` et `http://localhost:9000/oauth2/token` : endpoints du flux Authorization Code.
+
+### Client public enregistré
+
+| Paramètre | Valeur |
+|---|---|
+| `client_id` | `ecommerce-web` (client public, aucun secret) |
+| Flux | Authorization Code **avec PKCE obligatoire** (`S256`) |
+| Scopes | `openid`, `profile`, `email` |
+| URI de redirection | `http://127.0.0.1:8080/authorized` et `https://oauth.pstmn.io/v1/callback` |
+| Durée de l'access token | 15 minutes |
+| Consentement | désactivé (application de première partie) |
+
+Pour obtenir un token pas à pas (Postman, ou navigateur et `curl`), voir [docs/obtenir-un-token.md](docs/obtenir-un-token.md).
+
+### Limites connues
+
+- **L'appel vers `/internal/auth/verify` est en clair (HTTP) et non protégé** : n'importe quel client du réseau peut l'appeler. Il ne sera protégé que par le mTLS (étapes 6 et 7).
+- Pas de limitation des tentatives de connexion.
+- La disponibilité du serveur d'autorisation dépend de `user-service` : s'il est arrêté, plus personne ne peut se connecter (le serveur, lui, reste actif).
+- Les clés de signature sont générées **en mémoire** au démarrage : elles changent à chaque redémarrage, ce qui invalide tous les jetons déjà émis.
+- Aucun refresh token n'est émis (client public) ; l'utilisateur doit se reconnecter après l'expiration du token.
+- Le contenu du token est celui par défaut : seul le `sub` (UUID) vient de l'utilisateur. L'e-mail, le nom et les rôles viendront à l'étape 4.
 
 ## 9. Arborescence
 
