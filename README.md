@@ -1,11 +1,13 @@
 # ecommerce-secure — boutique en ligne d'électronique (Maroc), 3 microservices
 
-Socle **métier sans sécurité d'accès** : trois services Spring Boot indépendants, prêts à recevoir plus tard
-un 4e module (serveur d'autorisation OAuth 2.1 / OIDC), de la sécurité JWT sur les APIs et du mTLS entre services.
+Trois services Spring Boot indépendants, plus un serveur d'autorisation OAuth 2.1 / OIDC. Depuis l'étape 5,
+**chaque service valide lui-même les tokens JWT** ; le mTLS entre services viendra aux étapes suivantes.
 Tous les montants sont en **MAD** (dirham marocain).
 
-> ⚠️ **Aucune protection d'accès dans cette version** : tous les endpoints sont ouverts, `ownerId` est lu dans le
-> corps des requêtes, `/internal/auth/verify` est public. C'est volontaire ; voir « Préparation à la sécurité ».
+> 🔐 **Sécurité (étape 5)** : tous les endpoints exigent un token d'accès JWT, sauf quelques URL publiques
+> (voir [docs/validation-jwt-services.md](docs/validation-jwt-services.md)). Les **règles d'autorisation par rôle
+> ne sont pas encore appliquées** (étape suivante) : un token valide ouvre toutes les URL protégées. `ownerId` est
+> encore lu dans le corps des requêtes, et `/internal/auth/verify` reste public jusqu'au mTLS (étapes 6 et 7).
 
 ## 1. Architecture
 
@@ -53,7 +55,19 @@ scripts\start-all.bat                    # Windows
 ./mvnw -pl order-service spring-boot:run
 ```
 
-Swagger UI : <http://localhost:8081/swagger-ui.html>, `:8082`, `:8083` · Santé : `/actuator/health`.
+Santé : `/actuator/health` (public).
+
+**Ordre de démarrage recommandé** (celui des scripts) : `user-service`, `authorization-server`, `payment-service`,
+`order-service`. Un service démarre même si le serveur d'autorisation est arrêté, mais ce dernier doit être prêt
+avant la première requête authentifiée, et `user-service` avant la première connexion.
+
+**Swagger est désactivé par défaut** (les URL répondent 401). Pour l'activer, lancer les services avec le profil
+`demo` : `set SPRING_PROFILES_ACTIVE=demo` avant `scripts\start-all.bat` (Windows), ou
+`SPRING_PROFILES_ACTIVE=demo ./scripts/start-all.sh` (Git Bash, Linux, macOS), ou
+`./mvnw -pl user-service spring-boot:run "-Dspring-boot.run.profiles=demo"` pour un seul service. Swagger UI est alors
+public : <http://localhost:8081/swagger-ui.html>, `:8082`, `:8083` (les adresses affichées à la fin de `start-all.*`
+ne fonctionnent qu'avec ce profil). Le bouton **Authorize** accepte un access token pour tester les URL protégées.
+Détails dans [docs/validation-jwt-services.md](docs/validation-jwt-services.md).
 
 Variables d'environnement utiles : `USER_SERVICE_URL`, `PAYMENT_SERVICE_URL`, `HTTP_CONNECT_TIMEOUT`,
 `HTTP_READ_TIMEOUT`, `SEED_DEFAULT_PASSWORD`, `PAYMENT_RANDOM_SEED`, `PAYMENT_WEIGHT_SUCCESS`,
@@ -180,21 +194,28 @@ Codes : 400 validation / JSON illisible / propriété inconnue / UUID malformé 
 * **Idempotence** : clé unique + empreinte SHA-256 des paramètres ; le jeton de carte n'est **jamais** stocké
   (seulement marque, 4 derniers chiffres, résultat). Contraintes d'unicité en base (`orderId`, clé, référence) ;
   une collision concurrente est résolue en relisant la ligne gagnante.
-* **Mots de passe** : BCrypt (`spring-security-crypto` uniquement, pas le starter de sécurité), jamais renvoyés ni
+* **Mots de passe** : BCrypt, jamais renvoyés ni
   journalisés ; `toString()` des requêtes les masque ; emails masqués dans les logs (`h***@example.com`).
   Compte inconnu → comparaison BCrypt factice (même durée, même message que mot de passe erroné).
 * Jackson **refuse les propriétés inconnues** ; `Clock` injecté ; `open-in-view: false` ; H2 `create-drop`.
 
 ## 8. Préparation à la sécurité (étapes suivantes)
 
+* **Étape 5, validation des JWT (en place)** : chaque service est un *resource server* Spring Security. Il refuse
+  (401, format `ApiError`) tout appel sans token valide (signature, émetteur, expiration, claim `roles`), sauf les URL
+  publiques (`POST /users`, `GET /products…`, `/actuator/health`, et provisoirement `POST /internal/auth/verify`).
+  Réponse 503 si le serveur d'autorisation est injoignable. Voir [docs/validation-jwt-services.md](docs/validation-jwt-services.md)
+  (fonctionnement, configuration, dépannage, limites connues).
 * `ownerId` : lu dans `OrderController.create` puis passé explicitement à `OrderService.createOrder(ownerId, …)` —
   **un seul endroit** à remplacer par le claim `sub` du JWT ; aucun email/nom n'est copié hors de user-service.
-* `/internal/auth/verify` : réservé au futur serveur d'autorisation (à restreindre par mTLS / réseau).
-* `RestClientConfig` est l'**unique** point de création des clients HTTP (URL, timeouts) : brancher ici mTLS et le
-  relais de jeton. Les rôles (`CUSTOMER`, `ADMIN`) existent déjà dans l'identité vérifiée.
+* `/internal/auth/verify` : provisoirement public (le serveur d'autorisation n'a pas de JWT pour l'appeler) ; à
+  réserver au seul serveur d'autorisation par mTLS (étapes 6 et 7).
+* `RestClientConfig` est l'**unique** point de création des clients HTTP (URL, timeouts, relais du token par
+  `BearerTokenRelayInterceptor`) : brancher ici mTLS. Les rôles (`CUSTOMER`, `ADMIN`) sont dans le claim `roles`
+  du token ; leur application relève de l'étape suivante.
 * Nouveau module : ajouter un `<module>` au `pom.xml` parent ; les versions sont centralisées (`dependencyManagement`).
 
-## Module `authorization-server` (étapes 1 à 3)
+## Module `authorization-server` (étapes 1 à 4)
 
 Serveur d'autorisation OAuth 2.0 / OpenID Connect (Spring Authorization Server) qui émet les jetons JWT du projet. Il démarre sur le port **9000** et son émetteur (issuer) est fixé à `http://localhost:9000`.
 
@@ -232,6 +253,19 @@ La connexion **échoue fermée** : au moindre doute, aucun token n'est émis. Le
 
 Pour obtenir un token pas à pas (Postman, ou navigateur et `curl`), voir [docs/obtenir-un-token.md](docs/obtenir-un-token.md).
 
+### Contenu des tokens (étape 4)
+
+Le serveur enrichit les tokens à partir de l'utilisateur authentifié, sans appel supplémentaire à `user-service`. Ce format est un **contrat** avec l'étape 5 (détail, exemples et limites dans [docs/contrat-jwt.md](docs/contrat-jwt.md)) :
+
+| Claim | Valeur | Access token | ID token |
+|---|---|---|---|
+| `sub` | UUID de l'utilisateur | oui | oui |
+| `email` | adresse, si le scope `email` est accordé | oui | oui |
+| `name` | prénom et nom, si le scope `profile` est accordé | oui | oui |
+| `roles` | tableau sans préfixe `ROLE_` (ex. `["CUSTOMER"]`), trié, toujours présent | oui | non |
+
+Aucune donnée sensible (mot de passe, hash, téléphone, adresse, état du compte) n'est mise dans les tokens, et `email_verified` est volontairement absent. Les rôles sont figés dans le token jusqu'à son expiration (15 minutes). Le point de terminaison `GET /userinfo` (avec l'access token) renvoie `sub`, `email` et `name`. Pour vérifier les claims, voir [docs/obtenir-un-token.md](docs/obtenir-un-token.md).
+
 ### Limites connues
 
 - **L'appel vers `/internal/auth/verify` est en clair (HTTP) et non protégé** : n'importe quel client du réseau peut l'appeler. Il ne sera protégé que par le mTLS (étapes 6 et 7).
@@ -239,13 +273,13 @@ Pour obtenir un token pas à pas (Postman, ou navigateur et `curl`), voir [docs/
 - La disponibilité du serveur d'autorisation dépend de `user-service` : s'il est arrêté, plus personne ne peut se connecter (le serveur, lui, reste actif).
 - Les clés de signature sont générées **en mémoire** au démarrage : elles changent à chaque redémarrage, ce qui invalide tous les jetons déjà émis.
 - Aucun refresh token n'est émis (client public) ; l'utilisateur doit se reconnecter après l'expiration du token.
-- Le contenu du token est celui par défaut : seul le `sub` (UUID) vient de l'utilisateur. L'e-mail, le nom et les rôles viendront à l'étape 4.
+- Les tokens sont signés mais **non chiffrés** : leur contenu est lisible par tout détenteur. Un changement de rôle dans `user-service` n'est pris en compte qu'à la prochaine connexion.
 
 ## 9. Arborescence
 
 ```
 ecommerce-secure/  pom.xml  mvnw  mvnw.cmd  .mvn/  scripts/  README.md
-├── user-service/     controller service repository entity dto mapper exception config  (+ tests)
+├── user-service/     controller service repository entity dto mapper exception config security  (+ tests)
 ├── order-service/    … + client/ (UserClient, PaymentClient)
 └── payment-service/  …
 ```

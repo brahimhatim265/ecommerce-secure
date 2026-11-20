@@ -22,6 +22,11 @@ spring:
       write-dates-as-timestamps: false
     deserialization:
       fail-on-unknown-properties: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AUTH_ISSUER_URI:http://localhost:9000}
 
 management:
   endpoints:
@@ -40,3 +45,9 @@ payment:
         insufficient-funds: ${PAYMENT_WEIGHT_INSUFFICIENT_FUNDS:20}
         card-declined: ${PAYMENT_WEIGHT_CARD_DECLINED:10}
         expired-card: ${PAYMENT_WEIGHT_EXPIRED_CARD:10}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

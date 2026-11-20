@@ -1,0 +1,7 @@
+# DEMONSTRATION ONLY (profile "demo"): exposes Swagger UI and the OpenAPI definition, publicly.
+# Never activate this profile outside a demo: the API documentation reveals every endpoint of the service.
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

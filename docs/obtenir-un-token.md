@@ -1,4 +1,4 @@
-# Obtenir un token (étape 3)
+# Obtenir un token (étapes 3 et 4)
 
 Le serveur d'autorisation authentifie les personnes via `user-service`. Il faut donc démarrer les deux.
 
@@ -64,6 +64,38 @@ echo "<ACCESS_TOKEN>" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null
 ```
 Le `sub` doit valoir l'UUID de la personne connectée (ex. `00000000-0000-4000-8000-000000000001`), `iss` vaut `http://localhost:9000`, et `exp - iat` fait 900 secondes. Un message d'erreur de padding en fin de sortie est normal.
 
+## Claims attendus (étape 4)
+
+Avec le scope `openid profile email`, les tokens contiennent les claims du contrat décrit dans [contrat-jwt.md](contrat-jwt.md) :
+
+| Compte | `sub` | `email` | `name` | `roles` (access token seulement) |
+|---|---|---|---|---|
+| `hamza.belhaj@example.com` | `00000000-0000-4000-8000-000000000001` | `hamza.belhaj@example.com` | `Hamza Belhaj` | `["CUSTOMER"]` |
+| `admin@example.com` | `00000000-0000-4000-8000-000000000008` | `admin@example.com` | `Administrateur Boutique` | `["ADMIN"]` |
+
+- L'**ID token** contient `sub`, `email` et `name`, mais **pas** `roles`.
+- Avec le scope `openid` seul : ni `email` ni `name`, mais `roles` reste présent dans l'access token.
+- Ne doivent **jamais** apparaître : `password`, `passwordHash`, `phone`, `address`, `city`, `active`, `email_verified`.
+
+### Les vérifier
+
+Décoder chaque token séparément (access token, puis ID token). Sous PowerShell (en local, sans site externe) :
+
+```powershell
+$t = "COLLER_LE_TOKEN_ICI"
+$p = $t.Split('.')[1].Replace('-','+').Replace('_','/')
+$p = $p + ('=' * ((4 - $p.Length % 4) % 4))
+[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($p)) | ConvertFrom-Json | ConvertTo-Json
+```
+
+Pour l'**access token**, vérifier aussi `/userinfo` (il n'accepte **que** l'access token, pas l'ID token) :
+
+```bash
+curl -s http://localhost:9000/userinfo -H "Authorization: Bearer <ACCESS_TOKEN>"
+```
+
+La réponse contient `sub`, `email` et `name`. Pour tester le rôle `ADMIN`, refaire le flux avec `admin@example.com` / `Demo@2026`.
+
 ## Scénarios et résultats attendus
 
 | Scénario | Saisie | Résultat attendu |
@@ -79,3 +111,4 @@ Le `sub` doit valoir l'UUID de la personne connectée (ex. `00000000-0000-4000-8
 - `invalid_grant` : le code a déjà été utilisé, a expiré, ou le `code_verifier` ne correspond pas au `code_challenge`.
 - Erreur sur la redirection : `redirect_uri` doit être **exactement** `http://127.0.0.1:8080/authorized` (avec `127.0.0.1`, pas `localhost`).
 - Token refusé après un redémarrage du serveur d'autorisation : les clés sont en mémoire, il faut redemander un token.
+- `401 invalid_token` sur `/userinfo` : l'ID token a été envoyé au lieu de l'access token, le token a expiré (15 minutes), le serveur a redémarré depuis son émission, ou le token est mal collé (aucune espace ni retour à la ligne, sans écrire « Bearer » dans le champ de Postman).

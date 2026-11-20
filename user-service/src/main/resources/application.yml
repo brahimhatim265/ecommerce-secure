@@ -22,6 +22,11 @@ spring:
       write-dates-as-timestamps: false
     deserialization:
       fail-on-unknown-properties: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AUTH_ISSUER_URI:http://localhost:9000}
 
 management:
   endpoints:
@@ -33,3 +38,9 @@ app:
   seed:
     # DEMONSTRATION ONLY: shared password of the seeded accounts. Never use it outside a demo.
     default-password: ${SEED_DEFAULT_PASSWORD:Demo@2026}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

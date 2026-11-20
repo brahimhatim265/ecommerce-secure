@@ -4,16 +4,19 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ma.ensias.ecommerce.user.entity.User;
 import ma.ensias.ecommerce.user.repository.UserRepository;
+import ma.ensias.ecommerce.user.security.TestJwtDecoderConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.UUID;
 
+import static ma.ensias.ecommerce.user.security.TestJwtSupport.customer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -25,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** Full-stack tests of user-service (real services, real H2, seeded data). */
 @SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:users-it-${random.uuid};DB_CLOSE_DELAY=-1")
 @AutoConfigureMockMvc
+@Import(TestJwtDecoderConfig.class)
 class UserApiIntegrationTest {
 
     private static final String DEMO_PASSWORD = "Demo@2026";
@@ -59,11 +63,11 @@ class UserApiIntegrationTest {
     @Test
     void seededDataIsLoadedWithFixedUuids() throws Exception {
         assertThat(userRepository.count()).isGreaterThanOrEqualTo(9);
-        mvc.perform(get("/users/" + HAMZA_ID))
+        mvc.perform(get("/users/" + HAMZA_ID).with(customer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("hamza.belhaj@example.com"))
                 .andExpect(jsonPath("$.roles[0]").value("CUSTOMER"));
-        mvc.perform(get("/users/" + ANAS_ID))
+        mvc.perform(get("/users/" + ANAS_ID).with(customer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
     }
@@ -100,11 +104,11 @@ class UserApiIntegrationTest {
     void searchByEmailIsCaseInsensitive() throws Exception {
         register("search.me@example.com", "Lina", "Berrada", 201);
 
-        mvc.perform(get("/users").param("email", " SEARCH.me@Example.com"))
+        mvc.perform(get("/users").param("email", " SEARCH.me@Example.com").with(customer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].email").value("search.me@example.com"));
-        mvc.perform(get("/users").param("email", "nobody@example.com"))
+        mvc.perform(get("/users").param("email", "nobody@example.com").with(customer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
@@ -130,9 +134,9 @@ class UserApiIntegrationTest {
         assertThat(stored.getPasswordHash()).startsWith("$2").doesNotContain("Secret123");
 
         String created = result.getResponse().getContentAsString().toLowerCase();
-        String fetched = mvc.perform(get("/users/" + id)).andExpect(status().isOk()).andReturn()
+        String fetched = mvc.perform(get("/users/" + id).with(customer())).andExpect(status().isOk()).andReturn()
                 .getResponse().getContentAsString().toLowerCase();
-        String listed = mvc.perform(get("/users")).andExpect(status().isOk()).andReturn()
+        String listed = mvc.perform(get("/users").with(customer())).andExpect(status().isOk()).andReturn()
                 .getResponse().getContentAsString().toLowerCase();
         for (String content : new String[] {created, fetched, listed}) {
             assertThat(content).doesNotContain("password").doesNotContain("$2a$").doesNotContain("$2b$");
@@ -142,7 +146,7 @@ class UserApiIntegrationTest {
     @Test
     void emailCannotBeChangedByUpdate() throws Exception {
         mvc.perform(put("/users/" + HAMZA_ID).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firstName\":\"Hamza\",\"lastName\":\"Belhaj\",\"email\":\"x@example.com\"}"))
+                        .content("{\"firstName\":\"Hamza\",\"lastName\":\"Belhaj\",\"email\":\"x@example.com\"}").with(customer()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -152,7 +156,7 @@ class UserApiIntegrationTest {
         String id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
 
         mvc.perform(put("/users/" + id).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firstName\":\"Noura\",\"lastName\":\"Tahiri\",\"city\":\"Rabat\"}"))
+                        .content("{\"firstName\":\"Noura\",\"lastName\":\"Tahiri\",\"city\":\"Rabat\"}").with(customer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.firstName").value("Noura"))
@@ -167,7 +171,7 @@ class UserApiIntegrationTest {
         String id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
 
         mvc.perform(patch("/users/" + id + "/status").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"active\":false}"))
+                        .content("{\"active\":false}").with(customer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
 
@@ -231,7 +235,7 @@ class UserApiIntegrationTest {
 
     @Test
     void malformedUuidGives400AndUnknownUuidGives404() throws Exception {
-        mvc.perform(get("/users/abc")).andExpect(status().isBadRequest());
-        mvc.perform(get("/users/" + UUID.randomUUID())).andExpect(status().isNotFound());
+        mvc.perform(get("/users/abc").with(customer())).andExpect(status().isBadRequest());
+        mvc.perform(get("/users/" + UUID.randomUUID()).with(customer())).andExpect(status().isNotFound());
     }
 }

@@ -4,8 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
-/** BCrypt hashing (spring-security-crypto only: no security auto-configuration is involved). */
+/*BCrypt hashing of passwords*/
 @Configuration
 public class PasswordEncoderConfig {
 

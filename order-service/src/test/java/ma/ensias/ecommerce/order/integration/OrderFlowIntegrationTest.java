@@ -5,11 +5,13 @@ import ma.ensias.ecommerce.order.entity.Order;
 import ma.ensias.ecommerce.order.entity.OrderStatus;
 import ma.ensias.ecommerce.order.repository.OrderRepository;
 import ma.ensias.ecommerce.order.repository.ProductRepository;
+import ma.ensias.ecommerce.order.security.TestJwtDecoderConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpMethod;
@@ -25,6 +27,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 
+import static ma.ensias.ecommerce.order.security.TestJwtSupport.customer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -47,6 +50,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "services.user.base-url=http://user-service.test",
         "services.payment.base-url=http://payment-service.test"})
 @AutoConfigureMockMvc
+@Import(TestJwtDecoderConfig.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class OrderFlowIntegrationTest {
 
@@ -129,7 +133,7 @@ class OrderFlowIntegrationTest {
                         .body("{\"id\":6,\"reference\":\"PAY-ABC\",\"orderId\":6,\"status\":\"SUCCEEDED\"}"));
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)))
+                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)).with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(6))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
@@ -150,7 +154,7 @@ class OrderFlowIntegrationTest {
                 HttpStatus.CREATED);
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", "tok_declined_insufficient_funds", PS5_AND_CONTROLLER)))
+                        .content(orderBody("CARD", "tok_declined_insufficient_funds", PS5_AND_CONTROLLER)).with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PAYMENT_REFUSED"))
                 .andExpect(jsonPath("$.paymentFailureReason").value("INSUFFICIENT_FUNDS"))
@@ -167,7 +171,7 @@ class OrderFlowIntegrationTest {
         expectPayment("{\"id\":8,\"status\":\"PENDING\"}", HttpStatus.CREATED);
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CASH_ON_DELIVERY", null, PS5_AND_CONTROLLER)))
+                        .content(orderBody("CASH_ON_DELIVERY", null, PS5_AND_CONTROLLER)).with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.paymentMethod").value("CASH_ON_DELIVERY"));
@@ -182,7 +186,7 @@ class OrderFlowIntegrationTest {
         expectPayment("{\"id\":6,\"status\":\"SUCCEEDED\"}", HttpStatus.OK);
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)))
+                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)).with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
         server.verify();
@@ -195,7 +199,7 @@ class OrderFlowIntegrationTest {
                 .andRespond(withException(new IOException("down")));
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)))
+                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)).with(customer()))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.status").value(503))
                 .andExpect(jsonPath("$.details[0]").value("orderId: 6"));
@@ -212,7 +216,7 @@ class OrderFlowIntegrationTest {
         expectPayment("{}", HttpStatus.INTERNAL_SERVER_ERROR);
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)))
+                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)).with(customer()))
                 .andExpect(status().isServiceUnavailable());
 
         assertThat(orderRepository.findById(6L).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAYMENT_ERROR);
@@ -225,7 +229,7 @@ class OrderFlowIntegrationTest {
         expectPayment("{\"status\":400,\"message\":\"Unknown card token\",\"details\":[]}", HttpStatus.BAD_REQUEST);
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", "tok_nope", PS5_AND_CONTROLLER)))
+                        .content(orderBody("CARD", "tok_nope", PS5_AND_CONTROLLER)).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Unknown card token"));
 
@@ -239,7 +243,7 @@ class OrderFlowIntegrationTest {
         expectActiveUser();
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", "tok_visa_approved", "[{\"productId\":6,\"quantity\":9}]")))
+                        .content(orderBody("CARD", "tok_visa_approved", "[{\"productId\":6,\"quantity\":9}]")).with(customer()))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message").value(
                         org.hamcrest.Matchers.containsString("MacBook Air 13")));
@@ -254,7 +258,7 @@ class OrderFlowIntegrationTest {
         expectActiveUser();
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", "tok_visa_approved", "[{\"productId\":999,\"quantity\":1}]")))
+                        .content(orderBody("CARD", "tok_visa_approved", "[{\"productId\":999,\"quantity\":1}]")).with(customer()))
                 .andExpect(status().isNotFound());
 
         assertThat(orderRepository.count()).isEqualTo(5);
@@ -265,7 +269,7 @@ class OrderFlowIntegrationTest {
         server.expect(ExpectedCount.once(), requestTo(USER_URL)).andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)))
+                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)).with(customer()))
                 .andExpect(status().isNotFound());
 
         assertThat(stock("PS5-SLIM-STD")).isEqualTo(18);
@@ -278,7 +282,7 @@ class OrderFlowIntegrationTest {
                 "{\"id\":\"" + OWNER + "\",\"active\":false}", MediaType.APPLICATION_JSON));
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)))
+                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)).with(customer()))
                 .andExpect(status().isUnprocessableEntity());
         server.verify();
     }
@@ -288,7 +292,7 @@ class OrderFlowIntegrationTest {
         server.expect(ExpectedCount.once(), requestTo(USER_URL)).andRespond(withException(new IOException("down")));
 
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)))
+                        .content(orderBody("CARD", "tok_visa_approved", PS5_AND_CONTROLLER)).with(customer()))
                 .andExpect(status().isServiceUnavailable());
 
         assertThat(stock("PS5-SLIM-STD")).isEqualTo(18);
@@ -299,7 +303,7 @@ class OrderFlowIntegrationTest {
     void duplicateLinesGive400WithoutAnyRemoteCall() throws Exception {
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
                         .content(orderBody("CARD", "tok_visa_approved",
-                                "[{\"productId\":1,\"quantity\":1},{\"productId\":1,\"quantity\":2}]")))
+                                "[{\"productId\":1,\"quantity\":1},{\"productId\":1,\"quantity\":2}]")).with(customer()))
                 .andExpect(status().isBadRequest());
         server.verify();
     }
@@ -307,23 +311,23 @@ class OrderFlowIntegrationTest {
     @Test
     void validationErrorsMakeNoRemoteCall() throws Exception {
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", null, PS5_AND_CONTROLLER)))
+                        .content(orderBody("CARD", null, PS5_AND_CONTROLLER)).with(customer()))
                 .andExpect(status().isBadRequest());
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(orderBody("CARD", "tok_visa_approved", "[]")))
+                        .content(orderBody("CARD", "tok_visa_approved", "[]")).with(customer()))
                 .andExpect(status().isBadRequest());
         server.verify();
     }
 
     @Test
     void seededOrdersAreReadableAndFilteredByOwner() throws Exception {
-        mvc.perform(get("/orders/1")).andExpect(status().isOk())
+        mvc.perform(get("/orders/1").with(customer())).andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.totalAmount").value(6780.0))
                 .andExpect(jsonPath("$.items.length()").value(2));
-        mvc.perform(get("/orders").param("ownerId", OWNER)).andExpect(status().isOk())
+        mvc.perform(get("/orders").param("ownerId", OWNER).with(customer())).andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
-        mvc.perform(get("/orders/9999")).andExpect(status().isNotFound());
+        mvc.perform(get("/orders/9999").with(customer())).andExpect(status().isNotFound());
     }
 
     @Test
@@ -334,7 +338,7 @@ class OrderFlowIntegrationTest {
 
         String created = mvc.perform(post("/products").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sku\":\"NEW-1\",\"name\":\"Nouveau produit\",\"brand\":\"Marque\","
-                                + "\"category\":\"Gaming\",\"price\":99.9,\"stock\":5}"))
+                                + "\"category\":\"Gaming\",\"price\":99.9,\"stock\":5}").with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.price").value(99.90))
                 .andReturn().getResponse().getContentAsString();
@@ -342,12 +346,12 @@ class OrderFlowIntegrationTest {
 
         mvc.perform(post("/products").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sku\":\"NEW-1\",\"name\":\"Autre nom\",\"brand\":\"Marque\","
-                                + "\"category\":\"Gaming\",\"price\":99.9,\"stock\":5}"))
+                                + "\"category\":\"Gaming\",\"price\":99.9,\"stock\":5}").with(customer()))
                 .andExpect(status().isConflict());
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/products/" + id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sku\":\"NEW-1\",\"name\":\"Nouveau produit v2\",\"brand\":\"Marque\","
-                                + "\"category\":\"Gaming\",\"price\":120,\"stock\":7}"))
+                                + "\"category\":\"Gaming\",\"price\":120,\"stock\":7}").with(customer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stock").value(7));
     }

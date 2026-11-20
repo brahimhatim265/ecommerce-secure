@@ -11,12 +11,14 @@ import ma.ensias.ecommerce.order.exception.ExternalServiceException;
 import ma.ensias.ecommerce.order.exception.InvalidRequestException;
 import ma.ensias.ecommerce.order.exception.ResourceNotFoundException;
 import ma.ensias.ecommerce.order.service.OrderService;
+import ma.ensias.ecommerce.order.security.WebSliceSecurityTestConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -31,6 +33,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static ma.ensias.ecommerce.order.security.TestJwtSupport.customer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -44,6 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(OrderController.class)
+@Import(WebSliceSecurityTestConfig.class)
 class OrderControllerTest {
 
     private static final UUID OWNER = UUID.fromString("00000000-0000-4000-8000-000000000001");
@@ -91,7 +95,7 @@ class OrderControllerTest {
     void createReturns201AndPassesTheOwnerIdExplicitlyToTheService() throws Exception {
         when(orderService.createOrder(eq(OWNER), any(CreateOrderRequest.class))).thenReturn(order(OrderStatus.CONFIRMED));
 
-        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(validBody())))
+        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(validBody())).with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "http://localhost/orders/6"))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
@@ -107,7 +111,7 @@ class OrderControllerTest {
         when(orderService.createOrder(eq(OWNER), any(CreateOrderRequest.class)))
                 .thenReturn(order(OrderStatus.PAYMENT_REFUSED));
 
-        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(validBody())))
+        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(validBody())).with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PAYMENT_REFUSED"));
     }
@@ -119,7 +123,7 @@ class OrderControllerTest {
         body.remove("cardToken");
         when(orderService.createOrder(eq(OWNER), any(CreateOrderRequest.class))).thenReturn(order(OrderStatus.CONFIRMED));
 
-        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isCreated());
     }
 
@@ -144,7 +148,7 @@ class OrderControllerTest {
         Map<String, Object> body = validBody();
         body.put(field, value);
 
-        String content = mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+        String content = mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation failed"))
                 .andReturn().getResponse().getContentAsString();
@@ -168,7 +172,7 @@ class OrderControllerTest {
         Map<String, Object> body = validBody();
         body.put("items", List.of(badItem));
 
-        String content = mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+        String content = mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andReturn().getResponse().getContentAsString();
 
@@ -184,7 +188,7 @@ class OrderControllerTest {
         }
         body.put("items", lines);
 
-        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -193,7 +197,7 @@ class OrderControllerTest {
         Map<String, Object> body = validBody();
         body.remove("cardToken");
 
-        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details[0]").value(
                         org.hamcrest.Matchers.startsWith("cardToken: cardToken is required when paymentMethod is CARD")));
@@ -205,7 +209,7 @@ class OrderControllerTest {
         Map<String, Object> body = validBody();
         body.put("paymentMethod", "CASH_ON_DELIVERY");
 
-        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details[0]").value(
                         org.hamcrest.Matchers.containsString("must be absent when paymentMethod is CASH_ON_DELIVERY")));
@@ -215,15 +219,15 @@ class OrderControllerTest {
     void malformedOwnerIdMalformedJsonAndUnknownPropertyReturn400() throws Exception {
         Map<String, Object> body = validBody();
         body.put("ownerId", "not-a-uuid");
-        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest());
 
-        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content("{broken"))
+        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content("{broken").with(customer()))
                 .andExpect(status().isBadRequest());
 
         body = validBody();
         body.put("username", "hamza");
-        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details[0]").value("Unknown property: username"));
         verifyNoInteractions(orderService);
@@ -241,7 +245,7 @@ class OrderControllerTest {
 
         int[] expected = {404, 422, 400, 503, 409};
         for (int expectedStatus : expected) {
-            mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(validBody())))
+            mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(validBody())).with(customer()))
                     .andExpect(status().is(expectedStatus))
                     .andExpect(jsonPath("$.status").value(expectedStatus))
                     .andExpect(jsonPath("$.path").value("/orders"));
@@ -254,7 +258,7 @@ class OrderControllerTest {
                 .thenThrow(new ExternalServiceException("payment-service is unreachable or timed out",
                         List.of("orderId: 6")));
 
-        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(validBody())))
+        mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(validBody())).with(customer()))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.details[0]").value("orderId: 6"));
     }
@@ -265,19 +269,19 @@ class OrderControllerTest {
         when(orderService.listOrders(OWNER)).thenReturn(List.of(order(OrderStatus.CONFIRMED)));
         when(orderService.getOrder(99L)).thenThrow(new ResourceNotFoundException("Order not found: 99"));
 
-        mvc.perform(get("/orders/6")).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(6));
-        mvc.perform(get("/orders").param("ownerId", OWNER.toString())).andExpect(status().isOk())
+        mvc.perform(get("/orders/6").with(customer())).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(6));
+        mvc.perform(get("/orders").param("ownerId", OWNER.toString()).with(customer())).andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
-        mvc.perform(get("/orders/99")).andExpect(status().isNotFound());
-        mvc.perform(get("/orders/abc")).andExpect(status().isBadRequest());
-        mvc.perform(get("/orders").param("ownerId", "xyz")).andExpect(status().isBadRequest());
+        mvc.perform(get("/orders/99").with(customer())).andExpect(status().isNotFound());
+        mvc.perform(get("/orders/abc").with(customer())).andExpect(status().isBadRequest());
+        mvc.perform(get("/orders").param("ownerId", "xyz").with(customer())).andExpect(status().isBadRequest());
     }
 
     @Test
     void unexpectedErrorsAreHidden() throws Exception {
         when(orderService.getOrder(6L)).thenThrow(new IllegalStateException("select * from orders secret"));
 
-        String content = mvc.perform(get("/orders/6")).andExpect(status().isInternalServerError())
+        String content = mvc.perform(get("/orders/6").with(customer())).andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.message").value("Internal server error"))
                 .andReturn().getResponse().getContentAsString();
 

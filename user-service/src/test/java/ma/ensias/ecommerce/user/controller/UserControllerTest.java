@@ -9,12 +9,14 @@ import ma.ensias.ecommerce.user.entity.Role;
 import ma.ensias.ecommerce.user.exception.DuplicateResourceException;
 import ma.ensias.ecommerce.user.exception.ResourceNotFoundException;
 import ma.ensias.ecommerce.user.service.UserService;
+import ma.ensias.ecommerce.user.security.WebSliceSecurityTestConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -27,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static ma.ensias.ecommerce.user.security.TestJwtSupport.customer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -42,6 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
+@Import(WebSliceSecurityTestConfig.class)
 class UserControllerTest {
 
     private static final UUID ID = UUID.fromString("00000000-0000-4000-8000-000000000001");
@@ -183,7 +187,7 @@ class UserControllerTest {
     void listPassesTheEmailFilterToTheService() throws Exception {
         when(userService.listUsers("Hamza.Belhaj@Example.com")).thenReturn(List.of(response()));
 
-        mvc.perform(get("/users").param("email", "Hamza.Belhaj@Example.com"))
+        mvc.perform(get("/users").param("email", "Hamza.Belhaj@Example.com").with(customer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
         verify(userService).listUsers(eq("Hamza.Belhaj@Example.com"));
@@ -193,7 +197,7 @@ class UserControllerTest {
     void getReturnsTheUser() throws Exception {
         when(userService.getUser(ID)).thenReturn(response());
 
-        mvc.perform(get("/users/{id}", ID))
+        mvc.perform(get("/users/{id}", ID).with(customer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("hamza.belhaj@example.com"));
     }
@@ -202,7 +206,7 @@ class UserControllerTest {
     void getReturns404WhenUnknown() throws Exception {
         when(userService.getUser(ID)).thenThrow(new ResourceNotFoundException("User not found: " + ID));
 
-        mvc.perform(get("/users/{id}", ID))
+        mvc.perform(get("/users/{id}", ID).with(customer()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.error").value("Not Found"))
@@ -211,7 +215,7 @@ class UserControllerTest {
 
     @Test
     void getReturns400WhenIdIsNotAUuid() throws Exception {
-        mvc.perform(get("/users/abc"))
+        mvc.perform(get("/users/abc").with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
     }
@@ -224,7 +228,7 @@ class UserControllerTest {
         body.put("lastName", "Belhaj");
         body.put("city", "Casablanca");
 
-        mvc.perform(put("/users/{id}", ID).contentType(MediaType.APPLICATION_JSON).content(json(body)))
+        mvc.perform(put("/users/{id}", ID).contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isOk());
     }
 
@@ -235,7 +239,7 @@ class UserControllerTest {
         body.put("lastName", "Belhaj");
         body.put("email", "other@example.com");
 
-        mvc.perform(put("/users/{id}", ID).contentType(MediaType.APPLICATION_JSON).content(json(body)))
+        mvc.perform(put("/users/{id}", ID).contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details[0]").value("Unknown property: email"));
     }
@@ -246,7 +250,7 @@ class UserControllerTest {
         body.put("firstName", "");
         body.put("lastName", "Belhaj");
 
-        mvc.perform(put("/users/{id}", ID).contentType(MediaType.APPLICATION_JSON).content(json(body)))
+        mvc.perform(put("/users/{id}", ID).contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -255,26 +259,26 @@ class UserControllerTest {
         when(userService.updateStatus(eq(ID), any(UpdateStatusRequest.class))).thenReturn(response());
 
         mvc.perform(patch("/users/{id}/status", ID).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"active\": false}"))
+                        .content("{\"active\": false}").with(customer()))
                 .andExpect(status().isOk());
     }
 
     @Test
     void statusPatchRequiresTheActiveFlag() throws Exception {
-        mvc.perform(patch("/users/{id}/status", ID).contentType(MediaType.APPLICATION_JSON).content("{}"))
+        mvc.perform(patch("/users/{id}/status", ID).contentType(MediaType.APPLICATION_JSON).content("{}").with(customer()))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void usersCannotBeDeleted() throws Exception {
-        mvc.perform(delete("/users/{id}", ID))
+        mvc.perform(delete("/users/{id}", ID).with(customer()))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.status").value(405));
     }
 
     @Test
     void unknownUrlReturns404InTheCommonFormat() throws Exception {
-        mvc.perform(get("/nothing-here"))
+        mvc.perform(get("/nothing-here").with(customer()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.path").value("/nothing-here"));
@@ -284,7 +288,7 @@ class UserControllerTest {
     void unexpectedErrorsAreHiddenBehindAGenericMessage() throws Exception {
         when(userService.getUser(ID)).thenThrow(new IllegalStateException("select * from users -- secret detail"));
 
-        String content = mvc.perform(get("/users/{id}", ID))
+        String content = mvc.perform(get("/users/{id}", ID).with(customer()))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.message").value("Internal server error"))
                 .andReturn().getResponse().getContentAsString();

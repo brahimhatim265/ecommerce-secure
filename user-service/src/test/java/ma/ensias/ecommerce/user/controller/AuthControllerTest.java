@@ -6,9 +6,11 @@ import ma.ensias.ecommerce.user.entity.Role;
 import ma.ensias.ecommerce.user.exception.AccountDisabledException;
 import ma.ensias.ecommerce.user.exception.InvalidCredentialsException;
 import ma.ensias.ecommerce.user.service.AuthenticationService;
+import ma.ensias.ecommerce.user.security.WebSliceSecurityTestConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
+@Import(WebSliceSecurityTestConfig.class)
 class AuthControllerTest {
 
     private static final String BODY = "{\"email\":\"hamza.belhaj@example.com\",\"password\":\"Demo@2026\"}";
