@@ -215,6 +215,17 @@ Codes : 400 validation / JSON illisible / propriété inconnue / UUID malformé 
   du token ; leur application relève de l'étape suivante.
 * Nouveau module : ajouter un `<module>` au `pom.xml` parent ; les versions sont centralisées (`dependencyManagement`).
 
+## Certificats (PKI de démonstration, étape 6)
+
+Une autorité de certification interne et un certificat par service (`user-service`, `order-service`, `payment-service`, `authorization-server`) sont générés avec `keytool` pour préparer le **mTLS de l'étape 7**. **Rien n'est activé dans les services** pour l'instant. Les artefacts de `pki/generated/` sont versionnés (démonstration) ; la clé privée de la CA reste dans `pki/ca-private/`, exclu du dépôt.
+
+| | Windows | Linux / macOS / Git Bash |
+|---|---|---|
+| Générer | `pki\generate-pki.bat` | `./pki/generate-pki.sh` |
+| Vérifier | `pki\verify-pki.bat` | `./pki/verify-pki.sh` |
+
+Schéma de la PKI, glossaire, commandes `keytool`, certificats « négatifs », régénération, limites connues et dépannage : [docs/pki-certificats.md](docs/pki-certificats.md).
+
 ## Module `authorization-server` (étapes 1 à 4)
 
 Serveur d'autorisation OAuth 2.0 / OpenID Connect (Spring Authorization Server) qui émet les jetons JWT du projet. Il démarre sur le port **9000** et son émetteur (issuer) est fixé à `http://localhost:9000`.

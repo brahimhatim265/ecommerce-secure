@@ -1,0 +1,3 @@
+# Fins de ligne imposees : un .sh en CRLF ne s execute pas, un .bat en LF est fragile
+*.sh  text eol=lf
+*.bat text eol=crlf
