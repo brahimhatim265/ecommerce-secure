@@ -8,10 +8,10 @@ import ma.ensias.ecommerce.user.security.mtls.ServiceRuleDeniedHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -22,7 +22,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    ApiAuthenticationEntryPoint authenticationEntryPoint,
                                                    ApiAccessDeniedHandler accessDeniedHandler,
-                                                   ApiErrorWriter errorWriter) throws Exception {
+                                                   ApiErrorWriter errorWriter,
+                                                   JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
         // 401 or 403 according to why the service rule refused a request; everything else is left to the handlers above
         ServiceRuleDeniedHandler serviceRuleDeniedHandler =
                 new ServiceRuleDeniedHandler(authenticationEntryPoint, accessDeniedHandler);
@@ -44,7 +45,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(serviceRuleDeniedHandler)
                         .accessDeniedHandler(serviceRuleDeniedHandler))
                 .oauth2ResourceServer(resourceServer -> resourceServer
-                        .jwt(Customizer.withDefaults())
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 // who is calling, according to the client certificate: read by the service rule above
