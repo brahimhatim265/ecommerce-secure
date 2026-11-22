@@ -1,6 +1,9 @@
 # Matrice d'accès — Application de commande et paiement e-commerce
 
+
 Cette matrice est la **source de vérité** pour quatre usages : les annotations de sécurité du code, la configuration des URL publiques (configuration des services en Resource Server), les tests 401/403/404 (un test par ligne et par identité) et la section « Autorisation » du rapport.
+
+---
 
 ## 1. Identités et légende
 
@@ -41,7 +44,9 @@ mTLS est configuré en mode **`want`** : le serveur demande un certificat client
 | Certificat valide mais CN non autorisé pour cet endpoint | **403** | `service_not_allowed` |
 | Utilisateur non propriétaire d'un profil (identifiant UUID) | **403** | `not_owner` |
 | Utilisateur non propriétaire d'une commande ou d'un paiement (identifiant séquentiel) | **404** | `not_owner` |
-| JWT relayé dont le `sub` ne correspond pas à la ressource ou au `ownerId` demandé (règles A5, A7) | **403** | `subject_mismatch` |
+| JWT relayé dont le `sub` ne correspond pas à la ressource ou au `ownerId` demandé (règles A5, A7) | **403** | `not_owner` |
+
+Le motif `not_owner` est enregistré dans l'audit quel que soit le code envoyé au client (403 ou 404) : le client ne voit pas la raison, le journal la garde.
 
 Toutes les réponses 401/403/404 produites par la sécurité utilisent le format `ApiError` du projet (`timestamp`, `status`, `error`, `message`, `path`, `details`). Le message envoyé au client est volontairement générique : le motif précis (`reason`) n'apparaît que dans le journal d'audit.
 
@@ -118,7 +123,7 @@ Règles de décision :
 | A4 | Les listes sont filtrées selon l'identité : un `CUSTOMER` obtient uniquement ses éléments. S'il fournit un `ownerId` différent de son `sub`, la réponse est 403. Un `ADMIN` peut tout lister. | sujet : `sub`, rôle ; paramètre `ownerId` | O7, P4 |
 | A5 | Le propriétaire du paiement à créer (`body.ownerId`) doit correspondre au `sub` du jeton relayé par `order-service`. | requête : `ownerId` ; sujet : `sub` du jeton relayé ; appelant : CN | P1 |
 | A6 | `ownerId` d'une commande n'est jamais fourni par le client : il est égal au `sub` du jeton. | sujet : `sub` | O5 |
-| A7 | Quand l'appelant est `SERVICE_ORDER`, le `sub` du JWT relayé doit être égal à `{id}` : le service ne peut lire que l'utilisateur pour le compte duquel il agit. Sans JWT relayé : 401 ; `sub` différent : 403 `subject_mismatch`. | appelant : CN ; sujet : `sub` du jeton relayé ; ressource : `id` | U3 |
+| A7 | Quand l'appelant est `SERVICE_ORDER`, le `sub` du JWT relayé doit être égal à `{id}` : le service ne peut lire que l'utilisateur pour le compte duquel il agit. Sans JWT relayé : 401 `missing_token` ; `sub` différent : 403 `not_owner`. | appelant : CN ; sujet : `sub` du jeton relayé ; ressource : `id` | U3 |
 
 ---
 
@@ -180,9 +185,31 @@ Chaque ligne des tableaux §2 à §4 donne lieu à un test paramétré, pour cha
 | Client B (autre client) | 2xx | 403 | — | 403 (profil) ou 404 (commande, paiement) |
 | Administrateur | 2xx | 403 | 2xx | 2xx |
 | **Service autorisé + JWT relayé cohérent** (CN autorisé, `sub` du JWT = propriétaire ou `{id}`) | 2xx | 403 | 2xx | — |
-| **Service autorisé + JWT relayé d'un autre utilisateur** (CN autorisé, `sub` ≠ propriétaire ou `{id}`) | — | 403 | — | 403 `subject_mismatch` |
+| **Service autorisé + JWT relayé d'un autre utilisateur** (CN autorisé, `sub` ≠ propriétaire ou `{id}`) | — | 403 | — | 403 `not_owner` |
 | Service autorisé sans JWT | 401 sur les endpoints qui exigent un JWT relayé ; 2xx pour U6 | 403 | 401 | 401 |
 | Service dont le CN n'est pas autorisé (+ JWT) | 2xx si l'endpoint n'est pas réservé aux services | 403 `service_not_allowed` | 403 | 403 |
 | Appel sans certificat sur un endpoint réservé aux services | — | 401 `missing_certificate` | 401 | 401 |
 
 Les tests d'intégration avec de vrais certificats sont distincts de ces tests unitaires : les premiers (démonstrations avec les keystores et truststores générés) prouvent le mTLS, les seconds simulent les deux identités avec les post-processeurs `jwt()` et `x509()` de `spring-security-test`.
+
+---
+
+## 10. Journal d'audit : format
+
+Chaque décision d'accès (accordée ou refusée) produit une ligne, écrite par le logger `AUDIT` de chaque service :
+
+```
+AUDIT decision=DENY reason=not_owner method=GET path=/orders/42 user=00000000-0000-4000-8000-000000000002 caller=-
+```
+
+| Champ | Contenu |
+|---|---|
+| `decision` | `ALLOW` ou `DENY` |
+| `reason` | motif si `DENY`, `-` si `ALLOW` |
+| `method`, `path` | méthode HTTP et chemin, sans chaîne de requête |
+| `user` | `sub` du JWT (jamais l'email), ou `-` |
+| `caller` | CN du certificat client d'un service connu, ou `-` |
+
+Motifs possibles : `missing_token`, `invalid_token`, `missing_certificate`, `service_not_allowed`, `insufficient_role`, `not_owner`.
+
+Interdits dans le journal : jeton ou en-tête `Authorization`, mot de passe, hash, chaîne de requête, email non masqué.
