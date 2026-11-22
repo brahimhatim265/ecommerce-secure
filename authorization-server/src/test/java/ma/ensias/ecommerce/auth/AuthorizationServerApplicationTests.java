@@ -31,7 +31,7 @@ class AuthorizationServerApplicationTests {
     void discoveryDocumentExposesStandardOidcMetadata() throws Exception {
         mockMvc.perform(get("/.well-known/openid-configuration"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.issuer").value("http://localhost:9000"))
+                .andExpect(jsonPath("$.issuer").value("https://localhost:9000"))
                 .andExpect(jsonPath("$.authorization_endpoint").isNotEmpty())
                 .andExpect(jsonPath("$.token_endpoint").isNotEmpty())
                 .andExpect(jsonPath("$.jwks_uri").isNotEmpty());

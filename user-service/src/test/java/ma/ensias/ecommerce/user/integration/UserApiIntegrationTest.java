@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.user.integration;
 
+import ma.ensias.ecommerce.user.security.mtls.ClientCertificate;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ma.ensias.ecommerce.user.entity.User;
@@ -175,14 +176,14 @@ class UserApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
 
-        mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer()).contentType(MediaType.APPLICATION_JSON)
                         .content(credentials("to.disable@example.com", "Secret123")))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void verifyAcceptsTheDemoCredentials() throws Exception {
-        mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer()).contentType(MediaType.APPLICATION_JSON)
                         .content(credentials("hamza.belhaj@example.com", DEMO_PASSWORD)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(HAMZA_ID))
@@ -194,7 +195,7 @@ class UserApiIntegrationTest {
 
     @Test
     void verifyAcceptsAnotherEmailCase() throws Exception {
-        mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer()).contentType(MediaType.APPLICATION_JSON)
                         .content(credentials("HAMZA.Belhaj@EXAMPLE.com", DEMO_PASSWORD)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(HAMZA_ID));
@@ -202,11 +203,11 @@ class UserApiIntegrationTest {
 
     @Test
     void verifyGivesTheSame401ForWrongPasswordAndUnknownEmail() throws Exception {
-        String wrongPassword = mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON)
+        String wrongPassword = mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer()).contentType(MediaType.APPLICATION_JSON)
                         .content(credentials("hamza.belhaj@example.com", "Wrong-password1")))
                 .andExpect(status().isUnauthorized())
                 .andReturn().getResponse().getContentAsString();
-        String unknownEmail = mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON)
+        String unknownEmail = mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer()).contentType(MediaType.APPLICATION_JSON)
                         .content(credentials("ghost@example.com", "Wrong-password1")))
                 .andExpect(status().isUnauthorized())
                 .andReturn().getResponse().getContentAsString();
@@ -218,7 +219,7 @@ class UserApiIntegrationTest {
 
     @Test
     void verifyReturns403ForTheSeededDisabledAccount() throws Exception {
-        mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer()).contentType(MediaType.APPLICATION_JSON)
                         .content(credentials("anas.tazi@example.com", DEMO_PASSWORD)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value("Account is disabled"));
@@ -226,7 +227,7 @@ class UserApiIntegrationTest {
 
     @Test
     void verifyNeverLeaksPasswordOrHash() throws Exception {
-        String content = mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON)
+        String content = mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer()).contentType(MediaType.APPLICATION_JSON)
                         .content(credentials("hamza.belhaj@example.com", DEMO_PASSWORD)))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString().toLowerCase();
 

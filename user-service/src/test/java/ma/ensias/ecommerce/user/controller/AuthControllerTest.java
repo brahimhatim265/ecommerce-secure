@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.user.controller;
 
+import ma.ensias.ecommerce.user.security.mtls.ClientCertificate;
 import ma.ensias.ecommerce.user.dto.VerifiedIdentityResponse;
 import ma.ensias.ecommerce.user.dto.VerifyCredentialsRequest;
 import ma.ensias.ecommerce.user.entity.Role;
@@ -44,7 +45,7 @@ class AuthControllerTest {
                 new VerifiedIdentityResponse(id, "hamza.belhaj@example.com", "Hamza", "Belhaj",
                         Set.of(Role.CUSTOMER)));
 
-        String content = mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON)
+        String content = mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer()).contentType(MediaType.APPLICATION_JSON)
                         .content(BODY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id.toString()))
@@ -62,7 +63,7 @@ class AuthControllerTest {
         when(authenticationService.verify(any(VerifyCredentialsRequest.class)))
                 .thenThrow(new InvalidCredentialsException());
 
-        mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer()).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("Invalid credentials"));
@@ -73,7 +74,7 @@ class AuthControllerTest {
         when(authenticationService.verify(any(VerifyCredentialsRequest.class)))
                 .thenThrow(new AccountDisabledException());
 
-        mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer()).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.message").value("Account is disabled"));
@@ -81,14 +82,14 @@ class AuthControllerTest {
 
     @Test
     void missingPasswordReturns400() throws Exception {
-        mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"hamza.belhaj@example.com\"}"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void unknownPropertyReturns400() throws Exception {
-        mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"a@b.com\",\"password\":\"x\",\"username\":\"a\"}"))
                 .andExpect(status().isBadRequest());
     }

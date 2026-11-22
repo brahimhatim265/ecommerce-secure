@@ -1,23 +1,55 @@
 package ma.ensias.ecommerce.order.security;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
+import org.springframework.boot.ssl.SslBundle;
+import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.SupplierJwtDecoder;
+import org.springframework.web.client.RestOperations;
+import org.springframework.web.client.RestTemplate;
+
+import java.time.Duration;
 
 @Configuration
 public class JwtDecoderConfig {
 
-    /** Lazy decoder: the authorization server is contacted on the first authenticated request, not at startup. */
+    /** The SSL bundle declared in application.yml: its truststore holds the project CA. */
+    static final String SSL_BUNDLE_NAME = "mtls";
+
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
+
     @Bean
     public JwtDecoder jwtDecoder(
-            @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri) {
+            @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri,
+            SslBundles sslBundles) {
+        return lazyDecoder(issuerUri, sslBundles.getBundle(SSL_BUNDLE_NAME));
+    }
+
+    /**
+     * Lazy decoder: the authorization server is contacted on the first authenticated request, not at startup.
+     * The OIDC metadata and the signing keys (JWKS) are fetched over HTTPS by a client that trusts the project CA
+     * (truststore of the SSL bundle) and verifies the host name; a certificate from any other CA is refused.
+     */
+    static JwtDecoder lazyDecoder(String issuerUri, SslBundle sslBundle) {
+        RestOperations rest = httpsRestOperations(sslBundle);
         return new SupplierJwtDecoder(() -> {
-            NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
+            NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuerUri).restOperations(rest).build();
             decoder.setJwtValidator(TokenValidators.forIssuer(issuerUri));
             return decoder;
         });
+    }
+
+    /** The JDK HTTP client is used on purpose: it applies the protocols of the bundle (the simple one refuses them). */
+    private static RestOperations httpsRestOperations(SslBundle sslBundle) {
+        ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.defaults()
+                .withTimeouts(CONNECT_TIMEOUT, READ_TIMEOUT)
+                .withSslBundle(sslBundle);
+        return new RestTemplate(ClientHttpRequestFactoryBuilder.jdk().build(settings));
     }
 }

@@ -1,9 +1,35 @@
 server:
   port: 8082
+  ssl:
+    # HTTPS only: there is no HTTP connector. The client certificate is requested but NOT required ("want"),
+    # so public and JWT-authenticated endpoints stay reachable without one. Never use "need".
+    # Whatever certificate IS presented must be signed by the project CA, otherwise the handshake fails.
+    bundle: mtls
+    client-auth: want
 
 spring:
   application:
     name: order-service
+  # TLS material (step 7): one bundle named "mtls", used by the HTTPS server.
+  # DEMONSTRATION ONLY: the default password below is public. Override it with PKI_PASSWORD.
+  # Paths default to the classpath and can be overridden (ORDER_SERVICE_KEYSTORE_LOCATION / PKI_TRUSTSTORE_LOCATION,
+  # e.g. file:/path/to/keystore.p12).
+  ssl:
+    bundle:
+      jks:
+        mtls:
+          key:
+            alias: order-service
+          keystore:
+            location: ${ORDER_SERVICE_KEYSTORE_LOCATION:classpath:certs/keystore.p12}
+            password: ${PKI_PASSWORD:ecommerce-demo-pki}
+            type: PKCS12
+          truststore:
+            location: ${PKI_TRUSTSTORE_LOCATION:classpath:certs/truststore.p12}
+            password: ${PKI_PASSWORD:ecommerce-demo-pki}
+            type: PKCS12
+          options:
+            enabled-protocols: TLSv1.3,TLSv1.2
   datasource:
     url: jdbc:h2:mem:ordersdb;DB_CLOSE_DELAY=-1
     username: sa
@@ -26,7 +52,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${AUTH_ISSUER_URI:http://localhost:9000}
+          issuer-uri: ${AUTH_ISSUER_URI:https://localhost:9000}
 
 management:
   endpoints:
@@ -36,9 +62,9 @@ management:
 
 services:
   user:
-    base-url: ${USER_SERVICE_URL:http://localhost:8081}
+    base-url: ${USER_SERVICE_URL:https://localhost:8081}
   payment:
-    base-url: ${PAYMENT_SERVICE_URL:http://localhost:8083}
+    base-url: ${PAYMENT_SERVICE_URL:https://localhost:8083}
   http:
     connect-timeout: ${HTTP_CONNECT_TIMEOUT:2s}
     read-timeout: ${HTTP_READ_TIMEOUT:5s}

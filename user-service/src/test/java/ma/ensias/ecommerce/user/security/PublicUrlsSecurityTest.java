@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.user.security;
 
+import ma.ensias.ecommerce.user.security.mtls.ClientCertificate;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -43,12 +44,18 @@ class PublicUrlsSecurityTest {
                 .andExpect(status().isCreated());
     }
 
-    /** Provisional exception: the authorization server has no JWT when it verifies a login. */
+    /**
+     * The provisional exception is gone: no token is needed (the authorization server has none yet when it verifies a
+     * login), but its client certificate is. The other methods and paths stay protected, see below.
+     */
     @Test
-    void credentialVerificationIsPublicForThisMethodAndPathOnly() throws Exception {
+    void credentialVerificationNeedsTheCertificateOfTheAuthorizationServerAndNoToken() throws Exception {
         String body = "{\"email\":\"hamza.belhaj@example.com\",\"password\":\"Demo@2026\"}";
-        mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON).content(body))
+        mvc.perform(post("/internal/auth/verify").with(ClientCertificate.authorizationServer())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk());
+        mvc.perform(post("/internal/auth/verify").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
     }
 
     @ParameterizedTest(name = "{0} {1} requires a token")

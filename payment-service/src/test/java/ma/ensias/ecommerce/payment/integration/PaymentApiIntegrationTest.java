@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.payment.integration;
 
+import ma.ensias.ecommerce.payment.security.mtls.ClientCertificate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ma.ensias.ecommerce.payment.repository.PaymentRepository;
 import ma.ensias.ecommerce.payment.security.TestJwtDecoderConfig;
@@ -57,7 +58,7 @@ class PaymentApiIntegrationTest {
 
     @Test
     void approvedCardThenIdempotentReplayThenConflictOnDifferentParameters() throws Exception {
-        mvc.perform(post("/payments").header("Idempotency-Key", "it-key-1").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header("Idempotency-Key", "it-key-1").contentType(MediaType.APPLICATION_JSON)
                         .content(card(1001, "6780.00", "tok_visa_approved")).with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("SUCCEEDED"))
@@ -65,37 +66,37 @@ class PaymentApiIntegrationTest {
                 .andExpect(jsonPath("$.cardLast4").value("4242"));
         long rowsAfterFirstCall = paymentRepository.count();
 
-        mvc.perform(post("/payments").header("Idempotency-Key", "it-key-1").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header("Idempotency-Key", "it-key-1").contentType(MediaType.APPLICATION_JSON)
                         .content(card(1001, "6780.00", "tok_visa_approved")).with(customer()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Idempotent-Replayed", "true"))
                 .andExpect(jsonPath("$.status").value("SUCCEEDED"));
         assertThat(paymentRepository.count()).isEqualTo(rowsAfterFirstCall);
 
-        mvc.perform(post("/payments").header("Idempotency-Key", "it-key-1").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header("Idempotency-Key", "it-key-1").contentType(MediaType.APPLICATION_JSON)
                         .content(card(1001, "1.00", "tok_visa_approved")).with(customer()))
                 .andExpect(status().isConflict());
     }
 
     @Test
     void anotherKeyForTheSameOrderIsAConflict() throws Exception {
-        mvc.perform(post("/payments").header("Idempotency-Key", "it-key-2a").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header("Idempotency-Key", "it-key-2a").contentType(MediaType.APPLICATION_JSON)
                         .content(card(1002, "10.00", "tok_visa_approved")).with(customer()))
                 .andExpect(status().isCreated());
 
-        mvc.perform(post("/payments").header("Idempotency-Key", "it-key-2b").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header("Idempotency-Key", "it-key-2b").contentType(MediaType.APPLICATION_JSON)
                         .content(card(1002, "10.00", "tok_visa_approved")).with(customer()))
                 .andExpect(status().isConflict());
     }
 
     @Test
     void declinedCardsAreBusinessResultsWithTheRightReason() throws Exception {
-        mvc.perform(post("/payments").header("Idempotency-Key", "it-key-3a").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header("Idempotency-Key", "it-key-3a").contentType(MediaType.APPLICATION_JSON)
                         .content(card(1003, "50.00", "tok_declined_insufficient_funds")).with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("FAILED"))
                 .andExpect(jsonPath("$.failureReason").value("INSUFFICIENT_FUNDS"));
-        mvc.perform(post("/payments").header("Idempotency-Key", "it-key-3b").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header("Idempotency-Key", "it-key-3b").contentType(MediaType.APPLICATION_JSON)
                         .content(card(1004, "50.00", "tok_declined_expired_card")).with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.failureReason").value("EXPIRED_CARD"));
@@ -105,7 +106,7 @@ class PaymentApiIntegrationTest {
     void unknownTokenReturns400AndStoresNothing() throws Exception {
         long before = paymentRepository.count();
 
-        mvc.perform(post("/payments").header("Idempotency-Key", "it-key-4").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header("Idempotency-Key", "it-key-4").contentType(MediaType.APPLICATION_JSON)
                         .content(card(1005, "50.00", "tok_does_not_exist")).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Unknown card token"));
@@ -115,12 +116,12 @@ class PaymentApiIntegrationTest {
 
     @Test
     void randomTokenIsDrawnOnceAndNotRedrawnOnReplay() throws Exception {
-        String first = mvc.perform(post("/payments").header("Idempotency-Key", "it-key-5")
+        String first = mvc.perform(post("/payments").with(ClientCertificate.orderService()).header("Idempotency-Key", "it-key-5")
                         .contentType(MediaType.APPLICATION_JSON).content(card(1006, "75.00", "tok_random")).with(customer()))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
 
         for (int i = 0; i < 5; i++) {
-            String replay = mvc.perform(post("/payments").header("Idempotency-Key", "it-key-5")
+            String replay = mvc.perform(post("/payments").with(ClientCertificate.orderService()).header("Idempotency-Key", "it-key-5")
                             .contentType(MediaType.APPLICATION_JSON).content(card(1006, "75.00", "tok_random")).with(customer()))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
             assertThat(objectMapper.readTree(replay)).isEqualTo(objectMapper.readTree(first));
@@ -129,7 +130,7 @@ class PaymentApiIntegrationTest {
 
     @Test
     void cashOnDeliveryIsPendingThenCollectedOnceOnly() throws Exception {
-        String created = mvc.perform(post("/payments").header("Idempotency-Key", "it-key-6")
+        String created = mvc.perform(post("/payments").with(ClientCertificate.orderService()).header("Idempotency-Key", "it-key-6")
                         .contentType(MediaType.APPLICATION_JSON).content(cash(1007, "300.00")).with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"))
@@ -152,7 +153,7 @@ class PaymentApiIntegrationTest {
 
     @Test
     void validationErrorsAreReportedInTheCommonFormat() throws Exception {
-        mvc.perform(post("/payments").header("Idempotency-Key", "it-key-7").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header("Idempotency-Key", "it-key-7").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"orderId\":1008,\"ownerId\":\"" + OWNER
                                 + "\",\"amount\":10.00,\"currency\":\"MAD\",\"method\":\"CARD\"}").with(customer()))
                 .andExpect(status().isBadRequest())

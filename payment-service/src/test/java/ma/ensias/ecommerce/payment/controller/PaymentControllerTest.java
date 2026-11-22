@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.payment.controller;
 
+import ma.ensias.ecommerce.payment.security.mtls.ClientCertificate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ma.ensias.ecommerce.payment.dto.CreatePaymentRequest;
 import ma.ensias.ecommerce.payment.dto.PaymentCreationResult;
@@ -85,7 +86,7 @@ class PaymentControllerTest {
         when(paymentService.createPayment(any(CreatePaymentRequest.class), eq("order-42")))
                 .thenReturn(new PaymentCreationResult(payment(PaymentStatus.SUCCEEDED), false));
 
-        mvc.perform(post("/payments").header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
                         .content(json(validCardRequest())).with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "http://localhost/payments/7"))
@@ -100,7 +101,7 @@ class PaymentControllerTest {
         when(paymentService.createPayment(any(CreatePaymentRequest.class), eq("order-42")))
                 .thenReturn(new PaymentCreationResult(payment(PaymentStatus.FAILED), false));
 
-        mvc.perform(post("/payments").header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
                         .content(json(validCardRequest())).with(customer()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("FAILED"));
@@ -111,7 +112,7 @@ class PaymentControllerTest {
         when(paymentService.createPayment(any(CreatePaymentRequest.class), eq("order-42")))
                 .thenReturn(new PaymentCreationResult(payment(PaymentStatus.SUCCEEDED), true));
 
-        mvc.perform(post("/payments").header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
                         .content(json(validCardRequest())).with(customer()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Idempotent-Replayed", "true"));
@@ -125,14 +126,14 @@ class PaymentControllerTest {
         when(paymentService.createPayment(any(CreatePaymentRequest.class), eq("order-42")))
                 .thenReturn(new PaymentCreationResult(payment(PaymentStatus.PENDING), false));
 
-        mvc.perform(post("/payments").header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
                         .content(json(body)).with(customer()))
                 .andExpect(status().isCreated());
     }
 
     @Test
     void missingIdempotencyKeyReturns400() throws Exception {
-        mvc.perform(post("/payments").contentType(MediaType.APPLICATION_JSON).content(json(validCardRequest())).with(customer()))
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).contentType(MediaType.APPLICATION_JSON).content(json(validCardRequest())).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.details[0]").value("Idempotency-Key: header is required"));
@@ -142,7 +143,7 @@ class PaymentControllerTest {
     @ParameterizedTest(name = "Idempotency-Key ''{0}'' is rejected")
     @org.junit.jupiter.params.provider.ValueSource(strings = {"has space", "bad/slash", "quote\"", "é-accent"})
     void invalidIdempotencyKeyReturns400(String key) throws Exception {
-        mvc.perform(post("/payments").header(KEY_HEADER, key).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, key).contentType(MediaType.APPLICATION_JSON)
                         .content(json(validCardRequest())).with(customer()))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(paymentService);
@@ -150,7 +151,7 @@ class PaymentControllerTest {
 
     @Test
     void tooLongIdempotencyKeyReturns400() throws Exception {
-        mvc.perform(post("/payments").header(KEY_HEADER, "k".repeat(65)).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "k".repeat(65)).contentType(MediaType.APPLICATION_JSON)
                         .content(json(validCardRequest())).with(customer()))
                 .andExpect(status().isBadRequest());
     }
@@ -180,7 +181,7 @@ class PaymentControllerTest {
         Map<String, Object> body = validCardRequest();
         body.put(field, value);
 
-        String content = mvc.perform(post("/payments").header(KEY_HEADER, "order-42")
+        String content = mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42")
                         .contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation failed"))
@@ -195,7 +196,7 @@ class PaymentControllerTest {
         Map<String, Object> body = validCardRequest();
         body.remove("cardToken");
 
-        mvc.perform(post("/payments").header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
                         .content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details[0]").value(
@@ -207,7 +208,7 @@ class PaymentControllerTest {
         Map<String, Object> body = validCardRequest();
         body.put("method", "CASH_ON_DELIVERY");
 
-        mvc.perform(post("/payments").header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
                         .content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details[0]").value(
@@ -219,11 +220,11 @@ class PaymentControllerTest {
         Map<String, Object> body = validCardRequest();
         body.put("cardNumber", "4242424242424242");
 
-        mvc.perform(post("/payments").header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
                         .content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details[0]").value("Unknown property: cardNumber"));
-        mvc.perform(post("/payments").header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
                         .content("{oops").with(customer()))
                 .andExpect(status().isBadRequest());
     }
@@ -232,13 +233,13 @@ class PaymentControllerTest {
     void invalidEnumValueAndMalformedOwnerUuidReturn400() throws Exception {
         Map<String, Object> body = validCardRequest();
         body.put("method", "BITCOIN");
-        mvc.perform(post("/payments").header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
                         .content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest());
 
         body = validCardRequest();
         body.put("ownerId", "not-a-uuid");
-        mvc.perform(post("/payments").header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
                         .content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest());
     }
@@ -248,7 +249,7 @@ class PaymentControllerTest {
         when(paymentService.createPayment(any(CreatePaymentRequest.class), eq("order-42")))
                 .thenThrow(new InvalidRequestException("Unknown card token"));
 
-        mvc.perform(post("/payments").header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
                         .content(json(validCardRequest())).with(customer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Unknown card token"));
@@ -259,7 +260,7 @@ class PaymentControllerTest {
         when(paymentService.createPayment(any(CreatePaymentRequest.class), eq("order-42")))
                 .thenThrow(new DuplicateResourceException("Idempotency-Key already used with different parameters"));
 
-        mvc.perform(post("/payments").header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/payments").with(ClientCertificate.orderService()).header(KEY_HEADER, "order-42").contentType(MediaType.APPLICATION_JSON)
                         .content(json(validCardRequest())).with(customer()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409));

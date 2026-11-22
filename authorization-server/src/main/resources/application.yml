@@ -7,15 +7,41 @@
 
 server:
   port: 9000
+  ssl:
+    # HTTPS only: there is no HTTP connector. The client certificate is requested but NOT required ("want"),
+    # so public and JWT-authenticated endpoints stay reachable without one. Never use "need".
+    # Whatever certificate IS presented must be signed by the project CA, otherwise the handshake fails.
+    bundle: mtls
+    client-auth: want
 
 spring:
   application:
     name: authorization-server
+  # TLS material (step 7): one bundle named "mtls", used by the HTTPS server.
+  # DEMONSTRATION ONLY: the default password below is public. Override it with PKI_PASSWORD.
+  # Paths default to the classpath and can be overridden (AUTHORIZATION_SERVER_KEYSTORE_LOCATION / PKI_TRUSTSTORE_LOCATION,
+  # e.g. file:/path/to/keystore.p12).
+  ssl:
+    bundle:
+      jks:
+        mtls:
+          key:
+            alias: authorization-server
+          keystore:
+            location: ${AUTHORIZATION_SERVER_KEYSTORE_LOCATION:classpath:certs/keystore.p12}
+            password: ${PKI_PASSWORD:ecommerce-demo-pki}
+            type: PKCS12
+          truststore:
+            location: ${PKI_TRUSTSTORE_LOCATION:classpath:certs/truststore.p12}
+            password: ${PKI_PASSWORD:ecommerce-demo-pki}
+            type: PKCS12
+          options:
+            enabled-protocols: TLSv1.3,TLSv1.2
   security:
     oauth2:
       authorizationserver:
         # Fixed issuer: every service must trust exactly this value (localhost != 127.0.0.1).
-        issuer: http://localhost:9000
+        issuer: https://localhost:9000
         client:
           # Public client (the future web shop): no secret, Authorization Code + PKCE only.
           ecommerce-web:
@@ -43,4 +69,4 @@ spring:
 
 services:
   user:
-    base-url: ${USER_SERVICE_URL:http://localhost:8081}
+    base-url: ${USER_SERVICE_URL:https://localhost:8081}

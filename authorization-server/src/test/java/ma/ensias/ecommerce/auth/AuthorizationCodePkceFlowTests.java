@@ -47,7 +47,7 @@ class AuthorizationCodePkceFlowTests {
     private static final String REDIRECT_URI = "http://127.0.0.1:8080/authorized";
     private static final String SCOPE = "openid profile email";
     private static final String STATE = "state-123";
-    private static final String ISSUER = "http://localhost:9000";
+    private static final String ISSUER = "https://localhost:9000";
 
     @Autowired
     private MockMvc mockMvc;

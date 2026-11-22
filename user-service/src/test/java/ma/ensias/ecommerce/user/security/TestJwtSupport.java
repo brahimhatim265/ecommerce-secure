@@ -24,7 +24,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
  */
 public final class TestJwtSupport {
 
-    public static final String ISSUER = "http://localhost:9000";
+    public static final String ISSUER = "https://localhost:9000";
     public static final String SUBJECT = "00000000-0000-4000-8000-000000000001";
 
     /** The only key the test decoder trusts. */
