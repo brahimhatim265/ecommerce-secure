@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Import;
  */
 @TestConfiguration
 @Import({SecurityConfig.class, ApiAuthenticationEntryPoint.class, ApiAccessDeniedHandler.class,
-        ApiErrorWriter.class, TestJwtDecoderConfig.class})
+        ApiErrorWriter.class, TestJwtDecoderConfig.class,
+        JwtRolesConfig.class, MethodSecurityConfig.class, AccessRules.class})
 public class WebSliceSecurityTestConfig {
 }
