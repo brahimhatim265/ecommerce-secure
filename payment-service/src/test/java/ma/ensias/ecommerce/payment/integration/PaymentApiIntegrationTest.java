@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static ma.ensias.ecommerce.payment.security.TestIdentities.admin;
 import static ma.ensias.ecommerce.payment.security.TestJwtSupport.customer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -138,17 +139,17 @@ class PaymentApiIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         long id = objectMapper.readTree(created).get("id").asLong();
 
-        mvc.perform(post("/payments/" + id + "/collect").with(customer()))
+        mvc.perform(post("/payments/" + id + "/collect").with(admin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUCCEEDED"))
                 .andExpect(jsonPath("$.collectedAt").exists());
-        mvc.perform(post("/payments/" + id + "/collect").with(customer())).andExpect(status().isConflict());
+        mvc.perform(post("/payments/" + id + "/collect").with(admin())).andExpect(status().isConflict());
     }
 
     @Test
     void collectingACardPaymentIsAConflictAndUnknownIsNotFound() throws Exception {
-        mvc.perform(post("/payments/1/collect").with(customer())).andExpect(status().isConflict());
-        mvc.perform(post("/payments/987654/collect").with(customer())).andExpect(status().isNotFound());
+        mvc.perform(post("/payments/1/collect").with(admin())).andExpect(status().isConflict());
+        mvc.perform(post("/payments/987654/collect").with(admin())).andExpect(status().isNotFound());
     }
 
     @Test

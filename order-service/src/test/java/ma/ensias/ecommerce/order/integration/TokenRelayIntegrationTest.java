@@ -22,6 +22,7 @@ import org.springframework.web.client.RestTemplate;
 import java.io.IOException;
 import java.util.List;
 
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -85,7 +86,8 @@ class TokenRelayIntegrationTest {
 
     /** A caller whose access token has an exact, known value that the relay must forward untouched. */
     private static RequestPostProcessor callerHoldingTheToken() {
-        return jwt().jwt(token -> token.tokenValue(TOKEN).claim("roles", List.of("CUSTOMER")));
+        return jwt().jwt(token -> token.tokenValue(TOKEN).claim("roles", List.of("CUSTOMER")))
+                .authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
     }
 
     private void expectUserLookup() {

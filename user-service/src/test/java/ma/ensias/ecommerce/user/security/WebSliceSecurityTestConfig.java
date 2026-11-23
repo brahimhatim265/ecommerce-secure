@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.user.security;
 
+import ma.ensias.ecommerce.user.security.mtls.Callers;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
 
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Import;
 @TestConfiguration
 @Import({SecurityConfig.class, ApiAuthenticationEntryPoint.class, ApiAccessDeniedHandler.class,
         ApiErrorWriter.class, TestJwtDecoderConfig.class,
-        JwtRolesConfig.class, MethodSecurityConfig.class, AccessRules.class})
+        JwtRolesConfig.class, MethodSecurityConfig.class, AccessRules.class,
+        Callers.class})
 public class WebSliceSecurityTestConfig {
 }

@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.UUID;
 
+import static ma.ensias.ecommerce.user.security.TestIdentities.admin;
 import static ma.ensias.ecommerce.user.security.TestJwtSupport.customer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -105,11 +106,11 @@ class UserApiIntegrationTest {
     void searchByEmailIsCaseInsensitive() throws Exception {
         register("search.me@example.com", "Lina", "Berrada", 201);
 
-        mvc.perform(get("/users").param("email", " SEARCH.me@Example.com").with(customer()))
+        mvc.perform(get("/users").param("email", " SEARCH.me@Example.com").with(admin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].email").value("search.me@example.com"));
-        mvc.perform(get("/users").param("email", "nobody@example.com").with(customer()))
+        mvc.perform(get("/users").param("email", "nobody@example.com").with(admin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
@@ -137,7 +138,7 @@ class UserApiIntegrationTest {
         String created = result.getResponse().getContentAsString().toLowerCase();
         String fetched = mvc.perform(get("/users/" + id).with(customer())).andExpect(status().isOk()).andReturn()
                 .getResponse().getContentAsString().toLowerCase();
-        String listed = mvc.perform(get("/users").with(customer())).andExpect(status().isOk()).andReturn()
+        String listed = mvc.perform(get("/users").with(admin())).andExpect(status().isOk()).andReturn()
                 .getResponse().getContentAsString().toLowerCase();
         for (String content : new String[] {created, fetched, listed}) {
             assertThat(content).doesNotContain("password").doesNotContain("$2a$").doesNotContain("$2b$");
@@ -172,7 +173,7 @@ class UserApiIntegrationTest {
         String id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
 
         mvc.perform(patch("/users/" + id + "/status").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"active\":false}").with(customer()))
+                        .content("{\"active\":false}").with(admin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
 

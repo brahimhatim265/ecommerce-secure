@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.user.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,6 +28,8 @@ public class AuthController {
         this.authenticationService = authenticationService;
     }
 
+    // Matrice d'accès U6 : réservé au serveur d'autorisation (certificat)
+    @PreAuthorize("@callers.isService('SERVICE_AUTH')")
     @PostMapping("/verify")
     @Operation(summary = "Verify an email / password pair",
             description = "Returns the verified identity (never the hash). Unknown account and wrong password "

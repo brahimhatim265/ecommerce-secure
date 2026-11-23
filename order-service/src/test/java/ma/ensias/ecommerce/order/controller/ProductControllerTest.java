@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import static ma.ensias.ecommerce.order.security.TestIdentities.admin;
 import static ma.ensias.ecommerce.order.security.TestJwtSupport.customer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -94,7 +95,7 @@ class ProductControllerTest {
     void createReturns201WithLocation() throws Exception {
         when(productService.createProduct(any(ProductRequest.class))).thenReturn(product());
 
-        mvc.perform(post("/products").contentType(MediaType.APPLICATION_JSON).content(json(validBody())).with(customer()))
+        mvc.perform(post("/products").contentType(MediaType.APPLICATION_JSON).content(json(validBody())).with(admin()))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "http://localhost/products/2"));
     }
@@ -124,7 +125,7 @@ class ProductControllerTest {
         Map<String, Object> body = validBody();
         body.put(field, value);
 
-        String content = mvc.perform(post("/products").contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
+        String content = mvc.perform(post("/products").contentType(MediaType.APPLICATION_JSON).content(json(body)).with(admin()))
                 .andExpect(status().isBadRequest())
                 .andReturn().getResponse().getContentAsString();
 
@@ -137,7 +138,7 @@ class ProductControllerTest {
         when(productService.createProduct(any(ProductRequest.class)))
                 .thenThrow(new DuplicateResourceException("SKU already in use: PS5-DUALSENSE"));
 
-        mvc.perform(post("/products").contentType(MediaType.APPLICATION_JSON).content(json(validBody())).with(customer()))
+        mvc.perform(post("/products").contentType(MediaType.APPLICATION_JSON).content(json(validBody())).with(admin()))
                 .andExpect(status().isConflict());
     }
 
@@ -147,9 +148,9 @@ class ProductControllerTest {
         when(productService.updateProduct(eq(3L), any(ProductRequest.class)))
                 .thenThrow(new OptimisticLockingFailureException("collision"));
 
-        mvc.perform(put("/products/2").contentType(MediaType.APPLICATION_JSON).content(json(validBody())).with(customer()))
+        mvc.perform(put("/products/2").contentType(MediaType.APPLICATION_JSON).content(json(validBody())).with(admin()))
                 .andExpect(status().isOk());
-        mvc.perform(put("/products/3").contentType(MediaType.APPLICATION_JSON).content(json(validBody())).with(customer()))
+        mvc.perform(put("/products/3").contentType(MediaType.APPLICATION_JSON).content(json(validBody())).with(admin()))
                 .andExpect(status().isConflict());
     }
 }

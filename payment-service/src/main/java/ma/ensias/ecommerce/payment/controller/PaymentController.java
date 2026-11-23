@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.payment.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -43,6 +44,8 @@ public class PaymentController {
         this.paymentService = paymentService;
     }
 
+    // Matrice d'accès P1 : appel interne de order-service, pour le compte d'un utilisateur (JWT relayé)
+    @PreAuthorize("@callers.isService('SERVICE_ORDER') and isAuthenticated()")
     @PostMapping
     @Operation(summary = "Process a payment (idempotent)",
             description = "Sandbox mode: the card token decides the outcome. Available test tokens: "
@@ -73,6 +76,8 @@ public class PaymentController {
         return ResponseEntity.created(location).body(result.payment());
     }
 
+    // Matrice d'accès P2 : lecture d'un paiement (le propriétaire sera vérifié par la règle ABAC A3)
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     @GetMapping("/{id}")
     @Operation(summary = "Get a payment by id")
     @ApiResponse(responseCode = "404", description = "Payment not found")
@@ -80,6 +85,8 @@ public class PaymentController {
         return paymentService.getPayment(id);
     }
 
+    // Matrice d'accès P3 : paiement d'une commande (le propriétaire sera vérifié par la règle ABAC A3)
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     @GetMapping("/order/{orderId}")
     @Operation(summary = "Get the payment of an order")
     @ApiResponse(responseCode = "404", description = "No payment for this order")
@@ -87,12 +94,16 @@ public class PaymentController {
         return paymentService.getPaymentByOrder(orderId);
     }
 
+    // Matrice d'accès P4 : liste des paiements (filtrée par la règle ABAC A4)
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     @GetMapping
     @Operation(summary = "List payments, optionally filtered by owner")
     public List<PaymentResponse> list(@RequestParam(required = false) UUID ownerId) {
         return paymentService.listPayments(ownerId);
     }
 
+    // Matrice d'accès P5 : encaissement à la livraison : administration
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/{id}/collect")
     @Operation(summary = "Collect a cash-on-delivery payment",
             description = "Only a CASH_ON_DELIVERY payment in status PENDING can be collected (it becomes SUCCEEDED).")

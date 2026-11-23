@@ -27,6 +27,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 
+import static ma.ensias.ecommerce.order.security.TestIdentities.admin;
 import static ma.ensias.ecommerce.order.security.TestJwtSupport.customer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -338,7 +339,7 @@ class OrderFlowIntegrationTest {
 
         String created = mvc.perform(post("/products").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sku\":\"NEW-1\",\"name\":\"Nouveau produit\",\"brand\":\"Marque\","
-                                + "\"category\":\"Gaming\",\"price\":99.9,\"stock\":5}").with(customer()))
+                                + "\"category\":\"Gaming\",\"price\":99.9,\"stock\":5}").with(admin()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.price").value(99.90))
                 .andReturn().getResponse().getContentAsString();
@@ -346,12 +347,12 @@ class OrderFlowIntegrationTest {
 
         mvc.perform(post("/products").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sku\":\"NEW-1\",\"name\":\"Autre nom\",\"brand\":\"Marque\","
-                                + "\"category\":\"Gaming\",\"price\":99.9,\"stock\":5}").with(customer()))
+                                + "\"category\":\"Gaming\",\"price\":99.9,\"stock\":5}").with(admin()))
                 .andExpect(status().isConflict());
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/products/" + id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sku\":\"NEW-1\",\"name\":\"Nouveau produit v2\",\"brand\":\"Marque\","
-                                + "\"category\":\"Gaming\",\"price\":120,\"stock\":7}").with(customer()))
+                                + "\"category\":\"Gaming\",\"price\":120,\"stock\":7}").with(admin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stock").value(7));
     }
