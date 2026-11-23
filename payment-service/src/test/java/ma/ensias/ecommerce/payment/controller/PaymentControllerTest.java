@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static ma.ensias.ecommerce.payment.security.TestIdentities.admin;
 import static ma.ensias.ecommerce.payment.security.TestJwtSupport.customer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -295,9 +296,9 @@ class PaymentControllerTest {
         when(paymentService.collect(8L)).thenThrow(new InvalidPaymentStateException("not collectable"));
         when(paymentService.collect(9L)).thenThrow(new ResourceNotFoundException("Payment not found: 9"));
 
-        mvc.perform(post("/payments/7/collect").with(customer())).andExpect(status().isOk());
-        mvc.perform(post("/payments/8/collect").with(customer())).andExpect(status().isConflict());
-        mvc.perform(post("/payments/9/collect").with(customer())).andExpect(status().isNotFound());
+        mvc.perform(post("/payments/7/collect").with(admin())).andExpect(status().isOk());
+        mvc.perform(post("/payments/8/collect").with(admin())).andExpect(status().isConflict());
+        mvc.perform(post("/payments/9/collect").with(admin())).andExpect(status().isNotFound());
     }
 
     @Test

@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.order.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,6 +36,8 @@ public class OrderController {
         this.orderService = orderService;
     }
 
+    // Matrice d'accès O5 : un client passe une commande ; un administrateur ne le peut pas (D1)
+    @PreAuthorize("hasRole('CUSTOMER')")
     @PostMapping
     @Operation(summary = "Create and pay an order",
             description = "Checks the user (user-service), reserves the stock, pays through payment-service and "
@@ -56,6 +59,8 @@ public class OrderController {
         return ResponseEntity.created(location).body(created);
     }
 
+    // Matrice d'accès O6 : lecture d'une commande (le propriétaire sera vérifié par la règle ABAC A2)
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     @GetMapping("/{id}")
     @Operation(summary = "Get an order by id")
     @ApiResponse(responseCode = "404", description = "Order not found")
@@ -63,6 +68,8 @@ public class OrderController {
         return orderService.getOrder(id);
     }
 
+    // Matrice d'accès O7 : liste des commandes (filtrée par la règle ABAC A4)
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     @GetMapping
     @Operation(summary = "List orders, optionally filtered by owner (UUID)")
     public List<OrderResponse> list(@RequestParam(required = false) UUID ownerId) {

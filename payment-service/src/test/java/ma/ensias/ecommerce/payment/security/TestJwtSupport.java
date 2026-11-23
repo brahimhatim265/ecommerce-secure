@@ -83,8 +83,8 @@ public final class TestJwtSupport {
         }
     }
 
-    /** Authenticates a MockMvc request as a user holding a valid access token (no decoding involved). */
+    /** Authenticates a MockMvc request as the demo customer, with the authorities the service gives to a CUSTOMER. */
     public static RequestPostProcessor customer() {
-        return jwt().jwt(token -> token.subject(SUBJECT).claim("roles", List.of("CUSTOMER")));
+        return TestIdentities.customer();
     }
 }

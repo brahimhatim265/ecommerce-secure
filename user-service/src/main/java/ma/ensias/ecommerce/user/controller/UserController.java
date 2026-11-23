@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.user.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,6 +41,8 @@ public class UserController {
         this.userService = userService;
     }
 
+    // Matrice d'accès U1 : inscription publique
+    @PreAuthorize("permitAll()")
     @PostMapping
     @Operation(summary = "Register a new account (always with the CUSTOMER role)")
     @ApiResponse(responseCode = "201", description = "Account created")
@@ -52,12 +55,16 @@ public class UserController {
         return ResponseEntity.created(location).body(created);
     }
 
+    // Matrice d'accès U2 : liste et recherche des comptes : administration
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     @Operation(summary = "List users, optionally filtered by email (0 or 1 result)")
     public List<UserResponse> list(@RequestParam(required = false) @Size(max = 120) String email) {
         return userService.listUsers(email);
     }
 
+    // Matrice d'accès U3 : lecture d'un profil (le propriétaire sera vérifié par la règle ABAC A1/A7)
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     @GetMapping("/{id}")
     @Operation(summary = "Get a user by id (UUID)")
     @ApiResponse(responseCode = "200", description = "User found")
@@ -67,6 +74,8 @@ public class UserController {
         return userService.getUser(id);
     }
 
+    // Matrice d'accès U4 : modification d'un profil (le propriétaire sera vérifié par la règle ABAC A1)
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     @PutMapping("/{id}")
     @Operation(summary = "Update the profile (first name, last name, phone, address, city)")
     @ApiResponse(responseCode = "400", description = "Validation error or unknown property (e.g. email, roles)")
@@ -75,6 +84,8 @@ public class UserController {
         return userService.updateUser(id, request);
     }
 
+    // Matrice d'accès U5 : activation / désactivation d'un compte : administration
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/status")
     @Operation(summary = "Activate or deactivate an account")
     @ApiResponse(responseCode = "404", description = "User not found")

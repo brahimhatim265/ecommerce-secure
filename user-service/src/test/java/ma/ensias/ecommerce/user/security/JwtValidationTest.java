@@ -69,7 +69,7 @@ class JwtValidationTest {
 
     @Test
     void validTokenIsAccepted() throws Exception {
-        mvc.perform(get(PROTECTED_URL).header(HttpHeaders.AUTHORIZATION, "Bearer " + validToken()))
+        mvc.perform(get(PROTECTED_URL).header(HttpHeaders.AUTHORIZATION, "Bearer " + TestIdentities.adminBearerToken()))
                 .andExpect(status().isOk());
     }
 

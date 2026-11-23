@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static ma.ensias.ecommerce.user.security.TestIdentities.admin;
 import static ma.ensias.ecommerce.user.security.TestJwtSupport.customer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -187,7 +188,7 @@ class UserControllerTest {
     void listPassesTheEmailFilterToTheService() throws Exception {
         when(userService.listUsers("Hamza.Belhaj@Example.com")).thenReturn(List.of(response()));
 
-        mvc.perform(get("/users").param("email", "Hamza.Belhaj@Example.com").with(customer()))
+        mvc.perform(get("/users").param("email", "Hamza.Belhaj@Example.com").with(admin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
         verify(userService).listUsers(eq("Hamza.Belhaj@Example.com"));
@@ -259,13 +260,13 @@ class UserControllerTest {
         when(userService.updateStatus(eq(ID), any(UpdateStatusRequest.class))).thenReturn(response());
 
         mvc.perform(patch("/users/{id}/status", ID).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"active\": false}").with(customer()))
+                        .content("{\"active\": false}").with(admin()))
                 .andExpect(status().isOk());
     }
 
     @Test
     void statusPatchRequiresTheActiveFlag() throws Exception {
-        mvc.perform(patch("/users/{id}/status", ID).contentType(MediaType.APPLICATION_JSON).content("{}").with(customer()))
+        mvc.perform(patch("/users/{id}/status", ID).contentType(MediaType.APPLICATION_JSON).content("{}").with(admin()))
                 .andExpect(status().isBadRequest());
     }
 

@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.order.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,12 +37,16 @@ public class ProductController {
         this.productService = productService;
     }
 
+    // Matrice d'accès O1 : catalogue public
+    @PreAuthorize("permitAll()")
     @GetMapping
     @Operation(summary = "List products, optionally filtered by category")
     public List<ProductResponse> list(@RequestParam(required = false) @Size(max = 50) String category) {
         return productService.listProducts(category);
     }
 
+    // Matrice d'accès O2 : catalogue public
+    @PreAuthorize("permitAll()")
     @GetMapping("/{id}")
     @Operation(summary = "Get a product by id")
     @ApiResponse(responseCode = "404", description = "Product not found")
@@ -49,6 +54,8 @@ public class ProductController {
         return productService.getProduct(id);
     }
 
+    // Matrice d'accès O3 : gestion du catalogue : administration
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @Operation(summary = "Create a product")
     @ApiResponse(responseCode = "201", description = "Product created")
@@ -61,6 +68,8 @@ public class ProductController {
         return ResponseEntity.created(location).body(created);
     }
 
+    // Matrice d'accès O4 : gestion du catalogue : administration
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     @Operation(summary = "Replace a product")
     @ApiResponse(responseCode = "404", description = "Product not found")
