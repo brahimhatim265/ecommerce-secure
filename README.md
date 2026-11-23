@@ -1,13 +1,16 @@
 # ecommerce-secure — boutique en ligne d'électronique (Maroc), 3 microservices
 
 Trois services Spring Boot indépendants, plus un serveur d'autorisation OAuth 2.1 / OIDC. Depuis l'étape 5,
-**chaque service valide lui-même les tokens JWT** ; le mTLS entre services viendra aux étapes suivantes.
+**chaque service valide lui-même les tokens JWT** ; depuis l'étape 7, **toutes les communications sont en HTTPS** et les services s'identifient entre eux par certificat (mTLS).
 Tous les montants sont en **MAD** (dirham marocain).
 
-> 🔐 **Sécurité (étape 5)** : tous les endpoints exigent un token d'accès JWT, sauf quelques URL publiques
+> 🔐 **Sécurité (étapes 5 à 7)** : tous les endpoints exigent un token d'accès JWT, sauf quelques URL publiques
 > (voir [docs/validation-jwt-services.md](docs/validation-jwt-services.md)). Les **règles d'autorisation par rôle
 > ne sont pas encore appliquées** (étape suivante) : un token valide ouvre toutes les URL protégées. `ownerId` est
-> encore lu dans le corps des requêtes, et `/internal/auth/verify` reste public jusqu'au mTLS (étapes 6 et 7).
+> encore lu dans le corps des requêtes. Depuis l'étape 7, les services écoutent en **HTTPS uniquement** et deux
+> endpoints sont **réservés à un service précis** par son certificat client (mTLS) : `POST /internal/auth/verify`
+> (`authorization-server`) et `POST /payments` (`order-service`, avec le JWT de l'utilisateur relayé). Voir
+> [docs/mtls-services.md](docs/mtls-services.md).
 
 ## 1. Architecture
 
@@ -44,6 +47,11 @@ Une carte refusée est un **résultat métier normal** : `201` avec `status = PA
 
 * JDK 17 ou plus récent (le projet vise Java 17) ; Maven est fourni par le wrapper (`./mvnw`, `mvnw.cmd`).
 * Spring Boot **3.5.16** (dernière version de la branche 3.x), springdoc-openapi 2.8.13.
+* **Certificats (étape 7)** : avant le premier lancement, installer ceux de la PKI dans les modules, avec
+  `pki\install-certs.bat` (Windows) ou `./pki/install-certs.sh`. Les quatre services écoutent en **HTTPS** (8081, 8082,
+  8083, 9000) : le navigateur et Postman doivent faire confiance à `pki/generated/ca.crt`, et `curl` s'utilise avec
+  `--cacert pki/generated/ca.crt` (sous PowerShell : `curl.exe --ssl-no-revoke --cacert pki/generated/ca.crt`).
+  Détails dans [docs/mtls-services.md](docs/mtls-services.md).
 
 ```bash
 ./mvnw clean verify                      # compile + tous les tests des 3 modules
@@ -65,13 +73,15 @@ avant la première requête authentifiée, et `user-service` avant la première 
 `demo` : `set SPRING_PROFILES_ACTIVE=demo` avant `scripts\start-all.bat` (Windows), ou
 `SPRING_PROFILES_ACTIVE=demo ./scripts/start-all.sh` (Git Bash, Linux, macOS), ou
 `./mvnw -pl user-service spring-boot:run "-Dspring-boot.run.profiles=demo"` pour un seul service. Swagger UI est alors
-public : <http://localhost:8081/swagger-ui.html>, `:8082`, `:8083` (les adresses affichées à la fin de `start-all.*`
+public : <https://localhost:8081/swagger-ui.html>, `:8082`, `:8083` (les adresses affichées à la fin de `start-all.*`
 ne fonctionnent qu'avec ce profil). Le bouton **Authorize** accepte un access token pour tester les URL protégées.
 Détails dans [docs/validation-jwt-services.md](docs/validation-jwt-services.md).
 
 Variables d'environnement utiles : `USER_SERVICE_URL`, `PAYMENT_SERVICE_URL`, `HTTP_CONNECT_TIMEOUT`,
 `HTTP_READ_TIMEOUT`, `SEED_DEFAULT_PASSWORD`, `PAYMENT_RANDOM_SEED`, `PAYMENT_WEIGHT_SUCCESS`,
 `PAYMENT_WEIGHT_INSUFFICIENT_FUNDS`, `PAYMENT_WEIGHT_CARD_DECLINED`, `PAYMENT_WEIGHT_EXPIRED_CARD`.
+Pour le TLS : `PKI_PASSWORD`, `PKI_TRUSTSTORE_LOCATION`, `<SERVICE>_KEYSTORE_LOCATION` (par exemple
+`USER_SERVICE_KEYSTORE_LOCATION`), `AUTH_ISSUER_URI` (défaut `https://localhost:9000`).
 
 ## 3. Données de démonstration
 
@@ -121,8 +131,19 @@ Un jeton absent du catalogue → `400 "Unknown card token"`. Livraison : `CASH_O
 
 ## 5. API et scénarios `curl`
 
-Variables : `U=http://localhost:8081  O=http://localhost:8082  P=http://localhost:8083`
-et `H=00000000-0000-4000-8000-000000000001` (Hamza).
+Les services sont en **HTTPS**. Variables et réglage de `curl` (Git Bash, Linux, macOS ; le `curl.exe` de Windows
+ne sait pas lire un certificat client `.p12`, voir [docs/mtls-services.md](docs/mtls-services.md)) :
+
+```bash
+U=https://localhost:8081  O=https://localhost:8082  P=https://localhost:8083
+H=00000000-0000-4000-8000-000000000001                         # Hamza
+alias curl='curl --cacert pki/generated/ca.crt'                # faire confiance à la CA du projet
+AUTHCERT="--cert pki/generated/authorization-server/authorization-server.p12:ecommerce-demo-pki --cert-type P12"
+ORDERCERT="--cert pki/generated/order-service/order-service.p12:ecommerce-demo-pki --cert-type P12"
+```
+
+Depuis l'étape 5, l'API exige aussi un token : les exemples ci-dessous omettent `-H "Authorization: Bearer $TOKEN"`
+(voir [docs/obtenir-un-token.md](docs/obtenir-un-token.md)), sauf pour `POST /payments` où il est indispensable.
 
 ### user-service
 ```bash
@@ -135,11 +156,11 @@ curl -s -X POST $U/users -H 'Content-Type: application/json' -d '{
 curl -s -X PUT $U/users/$H -H 'Content-Type: application/json' -d '{"firstName":"Hamza","lastName":"Belhaj","city":"Rabat"}'   # 200
 curl -s -X PUT $U/users/$H -H 'Content-Type: application/json' -d '{"firstName":"H","lastName":"B","email":"x@y.com"}'          # 400 (email immuable)
 curl -s -X PATCH $U/users/$H/status -H 'Content-Type: application/json' -d '{"active":false}'                                  # 200
-# vérification d'identifiants (interne)
-curl -s -X POST $U/internal/auth/verify -H 'Content-Type: application/json' -d '{"email":"hamza.belhaj@example.com","password":"Demo@2026"}'  # 200 (jamais de hash)
-curl -s -X POST $U/internal/auth/verify -H 'Content-Type: application/json' -d '{"email":"hamza.belhaj@example.com","password":"faux"}'      # 401 "Invalid credentials"
-curl -s -X POST $U/internal/auth/verify -H 'Content-Type: application/json' -d '{"email":"inconnu@example.com","password":"faux"}'          # 401, même message
-curl -s -X POST $U/internal/auth/verify -H 'Content-Type: application/json' -d '{"email":"anas.tazi@example.com","password":"Demo@2026"}'   # 403 "Account is disabled"
+# vérification d'identifiants (interne) : réservée à authorization-server (certificat client) ; sans certificat -> 401, avec celui d'un autre service -> 403
+curl -s $AUTHCERT -X POST $U/internal/auth/verify -H 'Content-Type: application/json' -d '{"email":"hamza.belhaj@example.com","password":"Demo@2026"}'  # 200 (jamais de hash)
+curl -s $AUTHCERT -X POST $U/internal/auth/verify -H 'Content-Type: application/json' -d '{"email":"hamza.belhaj@example.com","password":"faux"}'      # 401 "Invalid credentials"
+curl -s $AUTHCERT -X POST $U/internal/auth/verify -H 'Content-Type: application/json' -d '{"email":"inconnu@example.com","password":"faux"}'          # 401, même message
+curl -s $AUTHCERT -X POST $U/internal/auth/verify -H 'Content-Type: application/json' -d '{"email":"anas.tazi@example.com","password":"Demo@2026"}'   # 403 "Account is disabled"
 ```
 
 ### order-service
@@ -163,8 +184,8 @@ curl -s $O/orders/6 ; curl -s "$O/orders?ownerId=$H"
 
 ### payment-service
 ```bash
-KEY=demo-$(date +%s)
-curl -s -i -X POST $P/payments -H "Idempotency-Key: $KEY" -H 'Content-Type: application/json' -d '{
+KEY=demo-$(date +%s)   # POST /payments : certificat d'order-service ET token ; sans certificat -> 401, autre service -> 403
+curl -s -i $ORDERCERT -H "Authorization: Bearer $TOKEN" -X POST $P/payments -H "Idempotency-Key: $KEY" -H 'Content-Type: application/json' -d '{
   "orderId":9001,"ownerId":"'$H'","amount":6780.00,"currency":"MAD","method":"CARD","cardToken":"tok_random"}'
 # -> 201 ; rejouer EXACTEMENT la même commande -> 200 + en-tête "Idempotent-Replayed: true", même paiement, pas de nouveau tirage
 # même clé avec un autre montant -> 409 ; autre clé pour la même commande -> 409 ; en-tête Idempotency-Key absent -> 400
@@ -203,38 +224,41 @@ Codes : 400 validation / JSON illisible / propriété inconnue / UUID malformé 
 
 * **Étape 5, validation des JWT (en place)** : chaque service est un *resource server* Spring Security. Il refuse
   (401, format `ApiError`) tout appel sans token valide (signature, émetteur, expiration, claim `roles`), sauf les URL
-  publiques (`POST /users`, `GET /products…`, `/actuator/health`, et provisoirement `POST /internal/auth/verify`).
+  publiques (`POST /users`, `GET /products…`, `/actuator/health`) et `POST /internal/auth/verify`, qui n'exige pas de token mais le certificat d'`authorization-server` (étape 7).
   Réponse 503 si le serveur d'autorisation est injoignable. Voir [docs/validation-jwt-services.md](docs/validation-jwt-services.md)
   (fonctionnement, configuration, dépannage, limites connues).
 * `ownerId` : lu dans `OrderController.create` puis passé explicitement à `OrderService.createOrder(ownerId, …)` —
   **un seul endroit** à remplacer par le claim `sub` du JWT ; aucun email/nom n'est copié hors de user-service.
-* `/internal/auth/verify` : provisoirement public (le serveur d'autorisation n'a pas de JWT pour l'appeler) ; à
-  réserver au seul serveur d'autorisation par mTLS (étapes 6 et 7).
+* **Étape 7, HTTPS et mTLS (en place)** : les quatre modules n'écoutent plus qu'en HTTPS (`client-auth: want`) ;
+  `POST /internal/auth/verify` est réservé à `authorization-server` et `POST /payments` à `order-service` (et exige le
+  JWT relayé) ; les appels sortants présentent le certificat du service ; l'issuer devient `https://localhost:9000`.
+  Fonctionnement, commandes `curl`, limites connues et dépannage : [docs/mtls-services.md](docs/mtls-services.md).
 * `RestClientConfig` est l'**unique** point de création des clients HTTP (URL, timeouts, relais du token par
-  `BearerTokenRelayInterceptor`) : brancher ici mTLS. Les rôles (`CUSTOMER`, `ADMIN`) sont dans le claim `roles`
+  `BearerTokenRelayInterceptor`, certificat client du SSL bundle `mtls`). Les rôles (`CUSTOMER`, `ADMIN`) sont dans le claim `roles`
   du token ; leur application relève de l'étape suivante.
 * Nouveau module : ajouter un `<module>` au `pom.xml` parent ; les versions sont centralisées (`dependencyManagement`).
 
 ## Certificats (PKI de démonstration, étape 6)
 
-Une autorité de certification interne et un certificat par service (`user-service`, `order-service`, `payment-service`, `authorization-server`) sont générés avec `keytool` pour préparer le **mTLS de l'étape 7**. **Rien n'est activé dans les services** pour l'instant. Les artefacts de `pki/generated/` sont versionnés (démonstration) ; la clé privée de la CA reste dans `pki/ca-private/`, exclu du dépôt.
+Une autorité de certification interne et un certificat par service (`user-service`, `order-service`, `payment-service`, `authorization-server`) sont générés avec `keytool` ; l'**étape 7** les utilise pour le HTTPS et le mTLS des services. Les artefacts de `pki/generated/` sont versionnés (démonstration) ; la clé privée de la CA reste dans `pki/ca-private/`, exclu du dépôt.
 
 | | Windows | Linux / macOS / Git Bash |
 |---|---|---|
 | Générer | `pki\generate-pki.bat` | `./pki/generate-pki.sh` |
 | Vérifier | `pki\verify-pki.bat` | `./pki/verify-pki.sh` |
+| Installer dans les modules | `pki\install-certs.bat` | `./pki/install-certs.sh` |
 
 Schéma de la PKI, glossaire, commandes `keytool`, certificats « négatifs », régénération, limites connues et dépannage : [docs/pki-certificats.md](docs/pki-certificats.md).
 
 ## Module `authorization-server` (étapes 1 à 4)
 
-Serveur d'autorisation OAuth 2.0 / OpenID Connect (Spring Authorization Server) qui émet les jetons JWT du projet. Il démarre sur le port **9000** et son émetteur (issuer) est fixé à `http://localhost:9000`.
+Serveur d'autorisation OAuth 2.0 / OpenID Connect (Spring Authorization Server) qui émet les jetons JWT du projet. Il démarre sur le port **9000** et son émetteur (issuer) est fixé à `https://localhost:9000` (HTTPS depuis l'étape 7).
 
 Lancement : `user-service` doit déjà tourner (port 8081). Ensuite, exécuter `AuthorizationServerApplication` depuis IntelliJ, ou `./mvnw -pl authorization-server spring-boot:run` (sous Windows : `mvnw.cmd -pl authorization-server spring-boot:run`). Ou lancer `scripts/start-all.*`, qui respecte l'ordre.
 
 ### Authentification (étape 3)
 
-Ce serveur n'a **aucune base d'utilisateurs**. À la page de connexion, la personne saisit son **email** (dans le champ « Username », nom imposé par Spring Security) et son mot de passe. Le serveur les transmet à `user-service` (`POST /internal/auth/verify`), qui reste seul à détenir les mots de passe hachés : le hash ne quitte jamais `user-service`. L'adresse de `user-service` se règle avec la variable `USER_SERVICE_URL` (défaut `http://localhost:8081`).
+Ce serveur n'a **aucune base d'utilisateurs**. À la page de connexion, la personne saisit son **email** (dans le champ « Username », nom imposé par Spring Security) et son mot de passe. Le serveur les transmet à `user-service` (`POST /internal/auth/verify`), qui reste seul à détenir les mots de passe hachés : le hash ne quitte jamais `user-service`. L'adresse de `user-service` se règle avec la variable `USER_SERVICE_URL` (défaut `https://localhost:8081`).
 
 | Réponse de `user-service` | Résultat de la connexion |
 |---|---|
@@ -247,9 +271,9 @@ La connexion **échoue fermée** : au moindre doute, aucun token n'est émis. Le
 
 ### URL utiles
 
-- `http://localhost:9000/.well-known/openid-configuration` : document de découverte OIDC ;
-- `http://localhost:9000/oauth2/jwks` : clés publiques de signature (aucune clé privée n'est exposée) ;
-- `http://localhost:9000/oauth2/authorize` et `http://localhost:9000/oauth2/token` : endpoints du flux Authorization Code.
+- `https://localhost:9000/.well-known/openid-configuration` : document de découverte OIDC ;
+- `https://localhost:9000/oauth2/jwks` : clés publiques de signature (aucune clé privée n'est exposée) ;
+- `https://localhost:9000/oauth2/authorize` et `https://localhost:9000/oauth2/token` : endpoints du flux Authorization Code.
 
 ### Client public enregistré
 
@@ -279,7 +303,7 @@ Aucune donnée sensible (mot de passe, hash, téléphone, adresse, état du comp
 
 ### Limites connues
 
-- **L'appel vers `/internal/auth/verify` est en clair (HTTP) et non protégé** : n'importe quel client du réseau peut l'appeler. Il ne sera protégé que par le mTLS (étapes 6 et 7).
+- **`/internal/auth/verify` n'est protégé que par le certificat de service** (mTLS, étape 7) : pas de révocation, pas de limitation des tentatives. Limites détaillées dans [docs/mtls-services.md](docs/mtls-services.md).
 - Pas de limitation des tentatives de connexion.
 - La disponibilité du serveur d'autorisation dépend de `user-service` : s'il est arrêté, plus personne ne peut se connecter (le serveur, lui, reste actif).
 - Les clés de signature sont générées **en mémoire** au démarrage : elles changent à chaque redémarrage, ce qui invalide tous les jetons déjà émis.
@@ -292,5 +316,8 @@ Aucune donnée sensible (mot de passe, hash, téléphone, adresse, état du comp
 ecommerce-secure/  pom.xml  mvnw  mvnw.cmd  .mvn/  scripts/  README.md
 ├── user-service/     controller service repository entity dto mapper exception config security  (+ tests)
 ├── order-service/    … + client/ (UserClient, PaymentClient)
-└── payment-service/  …
+├── payment-service/  …
+├── authorization-server/  serveur OAuth 2.1 / OIDC (config, client, security)
+├── pki/              CA et certificats de démonstration, scripts generate / verify / install
+└── docs/             contrat JWT, validation des JWT, PKI, mTLS, obtenir un token
 ```
