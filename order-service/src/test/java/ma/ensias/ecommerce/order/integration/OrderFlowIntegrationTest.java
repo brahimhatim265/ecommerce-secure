@@ -91,7 +91,7 @@ class OrderFlowIntegrationTest {
     private ObjectMapper objectMapper;
 
     private static String orderBody(String method, String token, String items) {
-        return "{\"ownerId\":\"" + OWNER + "\",\"shippingAddress\":\"45 Rue Ibnou Katir, Maârif\","
+        return "{\"shippingAddress\":\"45 Rue Ibnou Katir, Maârif\","
                 + "\"shippingCity\":\"Casablanca\",\"paymentMethod\":\"" + method + "\""
                 + (token == null ? "" : ",\"cardToken\":\"" + token + "\"") + ",\"items\":" + items + "}";
     }

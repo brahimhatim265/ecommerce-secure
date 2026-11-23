@@ -9,6 +9,7 @@ import ma.ensias.ecommerce.payment.entity.PaymentStatus;
 import ma.ensias.ecommerce.payment.exception.DuplicateResourceException;
 import ma.ensias.ecommerce.payment.exception.InvalidPaymentStateException;
 import ma.ensias.ecommerce.payment.exception.InvalidRequestException;
+import ma.ensias.ecommerce.payment.exception.NotOwnerException;
 import ma.ensias.ecommerce.payment.exception.ResourceNotFoundException;
 import ma.ensias.ecommerce.payment.mapper.PaymentMapper;
 import ma.ensias.ecommerce.payment.repository.PaymentRepository;
@@ -23,6 +24,7 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.time.temporal.ChronoUnit;
 
 /**
@@ -87,14 +89,37 @@ public class PaymentService {
 
     @Transactional(readOnly = true)
     public PaymentResponse getPayment(Long id) {
-        return paymentMapper.toResponse(paymentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Payment not found: " + id)));
+        return getPayment(id, owner -> true);
+    }
+
+    /**
+     * Reads a payment that the caller is allowed to see. {@code visibleToCaller} receives the owner of the payment;
+     * when it answers no, the result is the same as for a payment that does not exist (see {@link NotOwnerException}).
+     */
+    @Transactional(readOnly = true)
+    public PaymentResponse getPayment(Long id, Predicate<UUID> visibleToCaller) {
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found: " + id));
+        if (!visibleToCaller.test(payment.getOwnerId())) {
+            throw new NotOwnerException("Payment not found: " + id);
+        }
+        return paymentMapper.toResponse(payment);
     }
 
     @Transactional(readOnly = true)
     public PaymentResponse getPaymentByOrder(Long orderId) {
-        return paymentMapper.toResponse(paymentRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("No payment found for order " + orderId)));
+        return getPaymentByOrder(orderId, owner -> true);
+    }
+
+    /** Same as {@link #getPayment(Long, Predicate)}, looking the payment up by the order it pays. */
+    @Transactional(readOnly = true)
+    public PaymentResponse getPaymentByOrder(Long orderId, Predicate<UUID> visibleToCaller) {
+        Payment payment = paymentRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("No payment found for order " + orderId));
+        if (!visibleToCaller.test(payment.getOwnerId())) {
+            throw new NotOwnerException("No payment found for order " + orderId);
+        }
+        return paymentMapper.toResponse(payment);
     }
 
     @Transactional(readOnly = true)

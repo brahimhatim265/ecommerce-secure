@@ -66,7 +66,7 @@ class OrderPlacementServiceTest {
     }
 
     private static CreateOrderRequest request(OrderItemRequest... items) {
-        return new CreateOrderRequest(OWNER, "  45 Rue Ibnou Katir  ", "Casablanca", PaymentMethod.CARD,
+        return new CreateOrderRequest("  45 Rue Ibnou Katir  ", "Casablanca", PaymentMethod.CARD,
                 "tok_visa_approved", List.of(items));
     }
 

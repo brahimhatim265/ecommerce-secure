@@ -56,7 +56,7 @@ class TokenRelayIntegrationTest {
             + "\"roles\":[\"CUSTOMER\"],\"active\":true}";
     private static final String PAYMENT_SUCCEEDED =
             "{\"id\":6,\"reference\":\"PAY-ABC\",\"orderId\":6,\"status\":\"SUCCEEDED\"}";
-    private static final String ORDER_BODY = "{\"ownerId\":\"" + OWNER + "\",\"shippingAddress\":\"45 Rue Ibnou Katir\","
+    private static final String ORDER_BODY = "{\"shippingAddress\":\"45 Rue Ibnou Katir\","
             + "\"shippingCity\":\"Casablanca\",\"paymentMethod\":\"CARD\",\"cardToken\":\"tok_visa_approved\","
             + "\"items\":[{\"productId\":1,\"quantity\":1}]}";
 
@@ -86,7 +86,7 @@ class TokenRelayIntegrationTest {
 
     /** A caller whose access token has an exact, known value that the relay must forward untouched. */
     private static RequestPostProcessor callerHoldingTheToken() {
-        return jwt().jwt(token -> token.tokenValue(TOKEN).claim("roles", List.of("CUSTOMER")))
+        return jwt().jwt(token -> token.tokenValue(TOKEN).subject(OWNER).claim("roles", List.of("CUSTOMER")))
                 .authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
     }
 

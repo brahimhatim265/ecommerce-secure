@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.user.security;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -18,7 +19,7 @@ import java.util.UUID;
  *       (no authentication, anonymous, an authentication that is not a JWT, a {@code sub} that is not a UUID) gives
  *       NO identity;</li>
  *   <li>every method FAILS CLOSED: with no identity, a null argument or any doubt, the answer is {@code false};
- *       no method throws;</li>
+ *       the predicates never throw ({@link #ownerFilterFor} refuses by throwing);</li>
  *   <li>{@link #isAdmin} reads the authority {@code ROLE_ADMIN} built from the claim {@code roles};</li>
  *   <li>none of these methods says anything about the calling SERVICE (certificate): that is the bean
  *       "callers". A rule that needs both writes both.</li>
@@ -64,5 +65,22 @@ public class AccessRules {
     /** True for the owner of the resource, and for any administrator. */
     public boolean isOwnerOrAdmin(Authentication authentication, UUID ownerId) {
         return isAdmin(authentication) || isOwner(authentication, ownerId);
+    }
+
+    /**
+     * The owner that a list must be filtered on. An administrator gets what they asked for ({@code null} means
+     * everyone). Anyone else always gets THEIR OWN identity: asking for another owner is refused, and so is a caller
+     * without identity. This is the only method of the class that throws, because a list has no "false" to answer.
+     */
+    public UUID ownerFilterFor(Authentication authentication, UUID requestedOwnerId) {
+        if (isAdmin(authentication)) {
+            return requestedOwnerId;
+        }
+        UUID subject = subjectOf(authentication)
+                .orElseThrow(() -> new AccessDeniedException("No user identity"));
+        if (requestedOwnerId != null && !requestedOwnerId.equals(subject)) {
+            throw new AccessDeniedException("A user can only list their own resources");
+        }
+        return subject;
     }
 }

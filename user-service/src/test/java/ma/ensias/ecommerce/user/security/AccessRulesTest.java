@@ -1,6 +1,7 @@
 package ma.ensias.ecommerce.user.security;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AccessRulesTest {
 
@@ -109,5 +111,32 @@ class AccessRulesTest {
                 List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER")));
         assertThat(access.subjectOf(notAJwt)).isEmpty();
         assertThat(access.isOwner(notAJwt, CUSTOMER_ID)).isFalse();
+    }
+
+    @Test
+    void aCustomerIsAlwaysFilteredOnTheirOwnIdentity() {
+        assertThat(access.ownerFilterFor(customer(), null)).isEqualTo(CUSTOMER_ID);
+        assertThat(access.ownerFilterFor(customer(), CUSTOMER_ID)).isEqualTo(CUSTOMER_ID);
+    }
+
+    @Test
+    void aCustomerCannotListSomeoneElse() {
+        assertThatThrownBy(() -> access.ownerFilterFor(customer(), OTHER_ID)).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void anAdministratorGetsExactlyTheFilterTheyAskedFor() {
+        assertThat(access.ownerFilterFor(admin(), null)).isNull();
+        assertThat(access.ownerFilterFor(admin(), OTHER_ID)).isEqualTo(OTHER_ID);
+    }
+
+    @Test
+    void aCallerWithoutIdentityCannotListAnything() {
+        Authentication anonymous = new AnonymousAuthenticationToken("key", "anonymousUser",
+                List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS")));
+        assertThatThrownBy(() -> access.ownerFilterFor(anonymous, null)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> access.ownerFilterFor(null, null)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> access.ownerFilterFor(token("not-a-uuid", "CUSTOMER"), null))
+                .isInstanceOf(AccessDeniedException.class);
     }
 }

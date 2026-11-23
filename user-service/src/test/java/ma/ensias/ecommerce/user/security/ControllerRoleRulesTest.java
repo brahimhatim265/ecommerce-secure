@@ -28,6 +28,7 @@ import java.util.UUID;
 
 import static ma.ensias.ecommerce.user.security.TestIdentities.ADMIN_ID;
 import static ma.ensias.ecommerce.user.security.TestIdentities.CUSTOMER_ID;
+import static ma.ensias.ecommerce.user.security.TestIdentities.OTHER_CUSTOMER_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -221,5 +222,33 @@ class ControllerRoleRulesTest {
         admin();
         certificate(CallerIdentity.service(ServiceIdentity.SERVICE_ORDER));
         assertThat(refused(() -> auth.verify(null))).isTrue();
+    }
+
+    // ------------------------------------------------------------ A1 / A7 : a profile belongs to its owner
+
+    @Test
+    void a1_aCustomerReadsOnlyTheirOwnProfile() {
+        customer();
+        assertThat(refused(() -> users.get(CUSTOMER_ID))).isFalse();
+        assertThat(refused(() -> users.get(OTHER_CUSTOMER_ID))).isTrue();
+        admin();
+        assertThat(refused(() -> users.get(OTHER_CUSTOMER_ID))).isFalse();
+    }
+
+    @Test
+    void a1_aCustomerUpdatesOnlyTheirOwnProfile() {
+        customer();
+        assertThat(refused(() -> users.update(CUSTOMER_ID, null))).isFalse();
+        assertThat(refused(() -> users.update(OTHER_CUSTOMER_ID, null))).isTrue();
+        admin();
+        assertThat(refused(() -> users.update(OTHER_CUSTOMER_ID, null))).isFalse();
+    }
+
+    @Test
+    void a7_theOrderServiceReadsOnlyTheUserOfTheRelayedToken() {
+        customer();
+        certificate(CallerIdentity.service(ServiceIdentity.SERVICE_ORDER));
+        assertThat(refused(() -> users.get(CUSTOMER_ID))).isFalse();
+        assertThat(refused(() -> users.get(OTHER_CUSTOMER_ID))).isTrue();
     }
 }

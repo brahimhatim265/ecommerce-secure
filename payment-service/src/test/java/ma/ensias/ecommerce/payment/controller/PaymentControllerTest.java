@@ -269,8 +269,8 @@ class PaymentControllerTest {
 
     @Test
     void getByIdAndByOrderAndList() throws Exception {
-        when(paymentService.getPayment(7L)).thenReturn(payment(PaymentStatus.SUCCEEDED));
-        when(paymentService.getPaymentByOrder(42L)).thenReturn(payment(PaymentStatus.SUCCEEDED));
+        when(paymentService.getPayment(eq(7L), any())).thenReturn(payment(PaymentStatus.SUCCEEDED));
+        when(paymentService.getPaymentByOrder(eq(42L), any())).thenReturn(payment(PaymentStatus.SUCCEEDED));
         when(paymentService.listPayments(OWNER)).thenReturn(List.of(payment(PaymentStatus.SUCCEEDED)));
 
         mvc.perform(get("/payments/7").with(customer())).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(7));
@@ -282,7 +282,7 @@ class PaymentControllerTest {
 
     @Test
     void unknownPaymentReturns404AndMalformedIdReturns400() throws Exception {
-        when(paymentService.getPayment(99L)).thenThrow(new ResourceNotFoundException("Payment not found: 99"));
+        when(paymentService.getPayment(eq(99L), any())).thenThrow(new ResourceNotFoundException("Payment not found: 99"));
 
         mvc.perform(get("/payments/99").with(customer())).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
@@ -308,7 +308,7 @@ class PaymentControllerTest {
 
     @Test
     void unexpectedErrorsAreHidden() throws Exception {
-        when(paymentService.getPayment(7L)).thenThrow(new IllegalStateException("jdbc:h2 secret"));
+        when(paymentService.getPayment(eq(7L), any())).thenThrow(new IllegalStateException("jdbc:h2 secret"));
 
         String content = mvc.perform(get("/payments/7").with(customer())).andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.message").value("Internal server error"))

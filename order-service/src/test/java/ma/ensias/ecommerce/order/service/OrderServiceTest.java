@@ -66,7 +66,7 @@ class OrderServiceTest {
     }
 
     private static CreateOrderRequest request(PaymentMethod method, String token) {
-        return new CreateOrderRequest(OWNER, "45 Rue Ibnou Katir, Maârif", "Casablanca", method, token,
+        return new CreateOrderRequest("45 Rue Ibnou Katir, Maârif", "Casablanca", method, token,
                 List.of(new OrderItemRequest(1L, 1), new OrderItemRequest(2L, 1)));
     }
 
@@ -204,7 +204,7 @@ class OrderServiceTest {
 
     @Test
     void duplicateProductLinesAreRefusedFirst() {
-        CreateOrderRequest duplicated = new CreateOrderRequest(OWNER, "45 Rue Ibnou Katir", "Casablanca",
+        CreateOrderRequest duplicated = new CreateOrderRequest("45 Rue Ibnou Katir", "Casablanca",
                 PaymentMethod.CARD, "tok_visa_approved",
                 List.of(new OrderItemRequest(1L, 1), new OrderItemRequest(1L, 2)));
 
