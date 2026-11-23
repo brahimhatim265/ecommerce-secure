@@ -69,7 +69,7 @@ class UserApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("hamza.belhaj@example.com"))
                 .andExpect(jsonPath("$.roles[0]").value("CUSTOMER"));
-        mvc.perform(get("/users/" + ANAS_ID).with(customer()))
+        mvc.perform(get("/users/" + ANAS_ID).with(admin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
     }
@@ -136,7 +136,7 @@ class UserApiIntegrationTest {
         assertThat(stored.getPasswordHash()).startsWith("$2").doesNotContain("Secret123");
 
         String created = result.getResponse().getContentAsString().toLowerCase();
-        String fetched = mvc.perform(get("/users/" + id).with(customer())).andExpect(status().isOk()).andReturn()
+        String fetched = mvc.perform(get("/users/" + id).with(admin())).andExpect(status().isOk()).andReturn()
                 .getResponse().getContentAsString().toLowerCase();
         String listed = mvc.perform(get("/users").with(admin())).andExpect(status().isOk()).andReturn()
                 .getResponse().getContentAsString().toLowerCase();
@@ -158,7 +158,7 @@ class UserApiIntegrationTest {
         String id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
 
         mvc.perform(put("/users/" + id).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firstName\":\"Noura\",\"lastName\":\"Tahiri\",\"city\":\"Rabat\"}").with(customer()))
+                        .content("{\"firstName\":\"Noura\",\"lastName\":\"Tahiri\",\"city\":\"Rabat\"}").with(admin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.firstName").value("Noura"))
@@ -238,6 +238,6 @@ class UserApiIntegrationTest {
     @Test
     void malformedUuidGives400AndUnknownUuidGives404() throws Exception {
         mvc.perform(get("/users/abc").with(customer())).andExpect(status().isBadRequest());
-        mvc.perform(get("/users/" + UUID.randomUUID()).with(customer())).andExpect(status().isNotFound());
+        mvc.perform(get("/users/" + UUID.randomUUID()).with(admin())).andExpect(status().isNotFound());
     }
 }

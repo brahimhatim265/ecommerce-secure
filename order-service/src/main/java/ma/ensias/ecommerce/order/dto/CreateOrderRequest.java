@@ -9,15 +9,14 @@ import jakarta.validation.constraints.Size;
 import ma.ensias.ecommerce.order.entity.PaymentMethod;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
- * Order creation request. {@code ownerId} is temporarily part of the body; it will later come from the JWT
- * {@code sub} claim. {@code cardToken} is a public test token, never a card number.
+ * Order creation request. The owner of the order is NOT part of the body: it is the claim {@code sub} of the token.
+ * A body that contains {@code ownerId} is rejected as an unknown property. {@code cardToken} is a public test token,
+ * never a card number.
  */
 @ConsistentCardToken
 public record CreateOrderRequest(
-        @NotNull UUID ownerId,
         @NotBlank @Size(min = 5, max = 255) String shippingAddress,
         @NotBlank @Size(max = 60) String shippingCity,
         @NotNull PaymentMethod paymentMethod,

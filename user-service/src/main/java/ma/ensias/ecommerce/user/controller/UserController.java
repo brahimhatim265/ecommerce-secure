@@ -63,8 +63,8 @@ public class UserController {
         return userService.listUsers(email);
     }
 
-    // Matrice d'accès U3 : lecture d'un profil (le propriétaire sera vérifié par la règle ABAC A1/A7)
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
+    // Matrice d'accès U3 : lecture d'un profil, par son propriétaire ou par un administrateur (règles ABAC A1 et A7)
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('CUSTOMER') and @access.isOwner(authentication, #id))")
     @GetMapping("/{id}")
     @Operation(summary = "Get a user by id (UUID)")
     @ApiResponse(responseCode = "200", description = "User found")
@@ -74,8 +74,8 @@ public class UserController {
         return userService.getUser(id);
     }
 
-    // Matrice d'accès U4 : modification d'un profil (le propriétaire sera vérifié par la règle ABAC A1)
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
+    // Matrice d'accès U4 : modification d'un profil, par son propriétaire ou par un administrateur (règle ABAC A1)
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('CUSTOMER') and @access.isOwner(authentication, #id))")
     @PutMapping("/{id}")
     @Operation(summary = "Update the profile (first name, last name, phone, address, city)")
     @ApiResponse(responseCode = "400", description = "Validation error or unknown property (e.g. email, roles)")

@@ -13,6 +13,7 @@ import ma.ensias.ecommerce.order.entity.PaymentMethod;
 import ma.ensias.ecommerce.order.exception.BusinessRuleException;
 import ma.ensias.ecommerce.order.exception.ExternalServiceException;
 import ma.ensias.ecommerce.order.exception.InvalidRequestException;
+import ma.ensias.ecommerce.order.exception.NotOwnerException;
 import ma.ensias.ecommerce.order.exception.ResourceNotFoundException;
 import ma.ensias.ecommerce.order.mapper.OrderMapper;
 import ma.ensias.ecommerce.order.repository.OrderRepository;
@@ -27,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -86,8 +88,21 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public OrderResponse getOrder(Long id) {
-        return mapper.toResponse(orderRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id)));
+        return getOrder(id, owner -> true);
+    }
+
+    /**
+     * Reads an order that the caller is allowed to see. {@code visibleToCaller} receives the owner of the order; when
+     * it answers no, the result is the same as for an order that does not exist (see {@link NotOwnerException}).
+     */
+    @Transactional(readOnly = true)
+    public OrderResponse getOrder(Long id, Predicate<UUID> visibleToCaller) {
+        var order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+        if (!visibleToCaller.test(order.getOwnerId())) {
+            throw new NotOwnerException("Order not found: " + id);
+        }
+        return mapper.toResponse(order);
     }
 
     @Transactional(readOnly = true)

@@ -1,6 +1,8 @@
 package ma.ensias.ecommerce.payment.controller;
 
+import ma.ensias.ecommerce.payment.security.AccessRules;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -40,12 +42,17 @@ public class PaymentController {
 
     private final PaymentService paymentService;
 
-    public PaymentController(PaymentService paymentService) {
+    private final AccessRules access;
+
+    public PaymentController(PaymentService paymentService, AccessRules access) {
         this.paymentService = paymentService;
+        this.access = access;
     }
 
-    // Matrice d'accès P1 : appel interne de order-service, pour le compte d'un utilisateur (JWT relayé)
-    @PreAuthorize("@callers.isService('SERVICE_ORDER') and isAuthenticated()")
+    // Matrice d'accès P1 : appel interne de order-service, pour le compte d'un utilisateur (JWT relayé).
+    // Règle ABAC A5 : le propriétaire du paiement doit être l'utilisateur du jeton relayé.
+    @PreAuthorize("@callers.isService('SERVICE_ORDER') and isAuthenticated() "
+            + "and @access.isOwner(authentication, #request.ownerId())")
     @PostMapping
     @Operation(summary = "Process a payment (idempotent)",
             description = "Sandbox mode: the card token decides the outcome. Available test tokens: "
@@ -76,30 +83,31 @@ public class PaymentController {
         return ResponseEntity.created(location).body(result.payment());
     }
 
-    // Matrice d'accès P2 : lecture d'un paiement (le propriétaire sera vérifié par la règle ABAC A3)
+    // Matrice d'accès P2 : lecture d'un paiement, par son propriétaire ou par un administrateur (règle ABAC A3).
+    // Pour un autre client, la réponse est un 404 identique à celle d'un paiement inexistant (décision D2).
     @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     @GetMapping("/{id}")
     @Operation(summary = "Get a payment by id")
     @ApiResponse(responseCode = "404", description = "Payment not found")
-    public PaymentResponse get(@PathVariable Long id) {
-        return paymentService.getPayment(id);
+    public PaymentResponse get(@PathVariable Long id, Authentication authentication) {
+        return paymentService.getPayment(id, owner -> access.isOwnerOrAdmin(authentication, owner));
     }
 
-    // Matrice d'accès P3 : paiement d'une commande (le propriétaire sera vérifié par la règle ABAC A3)
+    // Matrice d'accès P3 : paiement d'une commande, par son propriétaire ou par un administrateur (règle ABAC A3, décision D2)
     @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     @GetMapping("/order/{orderId}")
     @Operation(summary = "Get the payment of an order")
     @ApiResponse(responseCode = "404", description = "No payment for this order")
-    public PaymentResponse getByOrder(@PathVariable Long orderId) {
-        return paymentService.getPaymentByOrder(orderId);
+    public PaymentResponse getByOrder(@PathVariable Long orderId, Authentication authentication) {
+        return paymentService.getPaymentByOrder(orderId, owner -> access.isOwnerOrAdmin(authentication, owner));
     }
 
-    // Matrice d'accès P4 : liste des paiements (filtrée par la règle ABAC A4)
+    // Matrice d'accès P4 : liste des paiements, filtrée sur l'identité de l'appelant (règle ABAC A4)
     @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     @GetMapping
     @Operation(summary = "List payments, optionally filtered by owner")
-    public List<PaymentResponse> list(@RequestParam(required = false) UUID ownerId) {
-        return paymentService.listPayments(ownerId);
+    public List<PaymentResponse> list(@RequestParam(required = false) UUID ownerId, Authentication authentication) {
+        return paymentService.listPayments(access.ownerFilterFor(authentication, ownerId));
     }
 
     // Matrice d'accès P5 : encaissement à la livraison : administration

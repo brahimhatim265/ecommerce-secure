@@ -1,6 +1,8 @@
 package ma.ensias.ecommerce.payment.security;
 
 import ma.ensias.ecommerce.payment.controller.PaymentController;
+import ma.ensias.ecommerce.payment.dto.CreatePaymentRequest;
+import ma.ensias.ecommerce.payment.entity.PaymentMethod;
 import ma.ensias.ecommerce.payment.security.mtls.CallerIdentity;
 import ma.ensias.ecommerce.payment.security.mtls.Callers;
 import ma.ensias.ecommerce.payment.security.mtls.ServiceIdentity;
@@ -21,11 +23,13 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
 import static ma.ensias.ecommerce.payment.security.TestIdentities.ADMIN_ID;
 import static ma.ensias.ecommerce.payment.security.TestIdentities.CUSTOMER_ID;
+import static ma.ensias.ecommerce.payment.security.TestIdentities.OTHER_CUSTOMER_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -94,6 +98,15 @@ class ControllerRoleRulesTest {
         user(CUSTOMER_ID);
     }
 
+    private static Authentication authentication() {
+        return SecurityContextHolder.getContext().getAuthentication();
+    }
+
+    private static CreatePaymentRequest paymentFor(UUID ownerId) {
+        return new CreatePaymentRequest(1L, ownerId, new BigDecimal("10.00"), "MAD",
+                PaymentMethod.CASH_ON_DELIVERY, null);
+    }
+
     /** The client certificate presented to the service, as the certificate filter would record it. */
     private static void certificate(CallerIdentity caller) {
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -110,39 +123,39 @@ class ControllerRoleRulesTest {
     void p1_theOrderServiceActingForAUserIsAllowed() {
         customer();
         certificate(CallerIdentity.service(ServiceIdentity.SERVICE_ORDER));
-        assertThat(refused(() -> payments.create(KEY, null))).isFalse();
+        assertThat(refused(() -> payments.create(KEY, paymentFor(CUSTOMER_ID)))).isFalse();
     }
 
     @Test
     void p1_theOrderServiceWithoutAUserIsRefused() {
         anonymous();
         certificate(CallerIdentity.service(ServiceIdentity.SERVICE_ORDER));
-        assertThat(refused(() -> payments.create(KEY, null))).isTrue();
+        assertThat(refused(() -> payments.create(KEY, paymentFor(CUSTOMER_ID)))).isTrue();
     }
 
     @Test
     void p1_aUserWithoutTheCertificateIsRefused() {
         customer();
-        assertThat(refused(() -> payments.create(KEY, null))).isTrue();
+        assertThat(refused(() -> payments.create(KEY, paymentFor(CUSTOMER_ID)))).isTrue();
         admin();
-        assertThat(refused(() -> payments.create(KEY, null))).isTrue();
+        assertThat(refused(() -> payments.create(KEY, paymentFor(CUSTOMER_ID)))).isTrue();
     }
 
     @Test
     void p1_anotherServiceOrAnUnknownCertificateIsRefused() {
         customer();
         certificate(CallerIdentity.service(ServiceIdentity.SERVICE_USER));
-        assertThat(refused(() -> payments.create(KEY, null))).isTrue();
+        assertThat(refused(() -> payments.create(KEY, paymentFor(CUSTOMER_ID)))).isTrue();
         certificate(CallerIdentity.service(ServiceIdentity.SERVICE_AUTH));
-        assertThat(refused(() -> payments.create(KEY, null))).isTrue();
+        assertThat(refused(() -> payments.create(KEY, paymentFor(CUSTOMER_ID)))).isTrue();
         certificate(CallerIdentity.unknownService("rogue-service"));
-        assertThat(refused(() -> payments.create(KEY, null))).isTrue();
+        assertThat(refused(() -> payments.create(KEY, paymentFor(CUSTOMER_ID)))).isTrue();
     }
 
     @Test
     void p1_noCallerAtAllIsRefused() {
         anonymous();
-        assertThat(refused(() -> payments.create(KEY, null))).isTrue();
+        assertThat(refused(() -> payments.create(KEY, paymentFor(CUSTOMER_ID)))).isTrue();
     }
 
     // ------------------------------------------------------------ P2, P3, P4 reading payments
@@ -150,46 +163,46 @@ class ControllerRoleRulesTest {
     @Test
     void p2_readingAPaymentNeedsARole() {
         customer();
-        assertThat(refused(() -> payments.get(1L))).isFalse();
+        assertThat(refused(() -> payments.get(1L, authentication()))).isFalse();
         admin();
-        assertThat(refused(() -> payments.get(1L))).isFalse();
+        assertThat(refused(() -> payments.get(1L, authentication()))).isFalse();
         userWithoutRole();
-        assertThat(refused(() -> payments.get(1L))).isTrue();
+        assertThat(refused(() -> payments.get(1L, authentication()))).isTrue();
         anonymous();
-        assertThat(refused(() -> payments.get(1L))).isTrue();
+        assertThat(refused(() -> payments.get(1L, authentication()))).isTrue();
     }
 
     @Test
     void p3_readingThePaymentOfAnOrderNeedsARole() {
         customer();
-        assertThat(refused(() -> payments.getByOrder(1L))).isFalse();
+        assertThat(refused(() -> payments.getByOrder(1L, authentication()))).isFalse();
         admin();
-        assertThat(refused(() -> payments.getByOrder(1L))).isFalse();
+        assertThat(refused(() -> payments.getByOrder(1L, authentication()))).isFalse();
         userWithoutRole();
-        assertThat(refused(() -> payments.getByOrder(1L))).isTrue();
+        assertThat(refused(() -> payments.getByOrder(1L, authentication()))).isTrue();
         anonymous();
-        assertThat(refused(() -> payments.getByOrder(1L))).isTrue();
+        assertThat(refused(() -> payments.getByOrder(1L, authentication()))).isTrue();
     }
 
     @Test
     void p4_listingPaymentsNeedsARole() {
         customer();
-        assertThat(refused(() -> payments.list(null))).isFalse();
+        assertThat(refused(() -> payments.list(null, authentication()))).isFalse();
         admin();
-        assertThat(refused(() -> payments.list(null))).isFalse();
+        assertThat(refused(() -> payments.list(null, authentication()))).isFalse();
         userWithoutRole();
-        assertThat(refused(() -> payments.list(null))).isTrue();
+        assertThat(refused(() -> payments.list(null, authentication()))).isTrue();
         anonymous();
-        assertThat(refused(() -> payments.list(null))).isTrue();
+        assertThat(refused(() -> payments.list(null, authentication()))).isTrue();
     }
 
     @Test
     void p2_p3_p4_aServiceCertificateAloneDoesNotGiveAccess() {
         anonymous();
         certificate(CallerIdentity.service(ServiceIdentity.SERVICE_ORDER));
-        assertThat(refused(() -> payments.get(1L))).isTrue();
-        assertThat(refused(() -> payments.getByOrder(1L))).isTrue();
-        assertThat(refused(() -> payments.list(null))).isTrue();
+        assertThat(refused(() -> payments.get(1L, authentication()))).isTrue();
+        assertThat(refused(() -> payments.getByOrder(1L, authentication()))).isTrue();
+        assertThat(refused(() -> payments.list(null, authentication()))).isTrue();
     }
 
     // ------------------------------------------------------------ P5 collect: ADMIN
@@ -209,5 +222,24 @@ class ControllerRoleRulesTest {
         customer();
         certificate(CallerIdentity.service(ServiceIdentity.SERVICE_ORDER));
         assertThat(refused(() -> payments.collect(1L))).isTrue();
+    }
+
+    // ------------------------------------------------------------ A5 : the payment belongs to the user of the relayed token
+
+    @Test
+    void a5_theOrderServiceCanPayOnlyForTheUserOfTheRelayedToken() {
+        customer();
+        certificate(CallerIdentity.service(ServiceIdentity.SERVICE_ORDER));
+        assertThat(refused(() -> payments.create(KEY, paymentFor(CUSTOMER_ID)))).isFalse();
+        assertThat(refused(() -> payments.create(KEY, paymentFor(OTHER_CUSTOMER_ID)))).isTrue();
+    }
+
+    @Test
+    void a5_aCustomerListsOnlyTheirPaymentsAndAnAdministratorMayAskForAnOwner() {
+        customer();
+        assertThat(refused(() -> payments.list(OTHER_CUSTOMER_ID, authentication()))).isTrue();
+        assertThat(refused(() -> payments.list(CUSTOMER_ID, authentication()))).isFalse();
+        admin();
+        assertThat(refused(() -> payments.list(OTHER_CUSTOMER_ID, authentication()))).isFalse();
     }
 }

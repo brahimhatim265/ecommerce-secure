@@ -71,7 +71,6 @@ class OrderControllerTest {
 
     private static Map<String, Object> validBody() {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("ownerId", OWNER.toString());
         body.put("shippingAddress", "45 Rue Ibnou Katir, Maârif");
         body.put("shippingCity", "Casablanca");
         body.put("paymentMethod", "CARD");
@@ -129,7 +128,6 @@ class OrderControllerTest {
 
     static Stream<Arguments> invalidBodies() {
         return Stream.of(
-                Arguments.of("ownerId", null),
                 Arguments.of("shippingAddress", ""),
                 Arguments.of("shippingAddress", "abc"),
                 Arguments.of("shippingAddress", "a".repeat(256)),
@@ -216,9 +214,9 @@ class OrderControllerTest {
     }
 
     @Test
-    void malformedOwnerIdMalformedJsonAndUnknownPropertyReturn400() throws Exception {
+    void ownerIdInTheBodyMalformedJsonAndUnknownPropertyReturn400() throws Exception {
         Map<String, Object> body = validBody();
-        body.put("ownerId", "not-a-uuid");
+        body.put("ownerId", OWNER.toString());
         mvc.perform(post("/orders").contentType(MediaType.APPLICATION_JSON).content(json(body)).with(customer()))
                 .andExpect(status().isBadRequest());
 
@@ -265,9 +263,9 @@ class OrderControllerTest {
 
     @Test
     void getAndListOrders() throws Exception {
-        when(orderService.getOrder(6L)).thenReturn(order(OrderStatus.CONFIRMED));
+        when(orderService.getOrder(eq(6L), any())).thenReturn(order(OrderStatus.CONFIRMED));
         when(orderService.listOrders(OWNER)).thenReturn(List.of(order(OrderStatus.CONFIRMED)));
-        when(orderService.getOrder(99L)).thenThrow(new ResourceNotFoundException("Order not found: 99"));
+        when(orderService.getOrder(eq(99L), any())).thenThrow(new ResourceNotFoundException("Order not found: 99"));
 
         mvc.perform(get("/orders/6").with(customer())).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(6));
         mvc.perform(get("/orders").param("ownerId", OWNER.toString()).with(customer())).andExpect(status().isOk())
@@ -279,7 +277,7 @@ class OrderControllerTest {
 
     @Test
     void unexpectedErrorsAreHidden() throws Exception {
-        when(orderService.getOrder(6L)).thenThrow(new IllegalStateException("select * from orders secret"));
+        when(orderService.getOrder(eq(6L), any())).thenThrow(new IllegalStateException("select * from orders secret"));
 
         String content = mvc.perform(get("/orders/6").with(customer())).andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.message").value("Internal server error"))

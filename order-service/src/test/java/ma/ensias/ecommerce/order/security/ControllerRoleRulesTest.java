@@ -98,6 +98,10 @@ class ControllerRoleRulesTest {
         user(CUSTOMER_ID);
     }
 
+    private static Authentication authentication() {
+        return SecurityContextHolder.getContext().getAuthentication();
+    }
+
 
     // ------------------------------------------------------------ O1, O2 catalog: public
 
@@ -141,21 +145,21 @@ class ControllerRoleRulesTest {
     @Test
     void o5_aCustomerCanPlaceAnOrder() {
         customer();
-        assertThat(refused(() -> orders.create(null))).isFalse();
+        assertThat(refused(() -> orders.create(null, authentication()))).isFalse();
     }
 
     @Test
     void o5_anAdministratorCannotPlaceAnOrder() {
         admin();
-        assertThat(refused(() -> orders.create(null))).isTrue();
+        assertThat(refused(() -> orders.create(null, authentication()))).isTrue();
     }
 
     @Test
     void o5_aUserWithoutRoleOrAnAnonymousCallerIsRefused() {
         userWithoutRole();
-        assertThat(refused(() -> orders.create(null))).isTrue();
+        assertThat(refused(() -> orders.create(null, authentication()))).isTrue();
         anonymous();
-        assertThat(refused(() -> orders.create(null))).isTrue();
+        assertThat(refused(() -> orders.create(null, authentication()))).isTrue();
     }
 
     // ------------------------------------------------------------ O6 read an order, O7 list orders
@@ -163,24 +167,24 @@ class ControllerRoleRulesTest {
     @Test
     void o6_readingAnOrderNeedsARole() {
         customer();
-        assertThat(refused(() -> orders.get(1L))).isFalse();
+        assertThat(refused(() -> orders.get(1L, authentication()))).isFalse();
         admin();
-        assertThat(refused(() -> orders.get(1L))).isFalse();
+        assertThat(refused(() -> orders.get(1L, authentication()))).isFalse();
         userWithoutRole();
-        assertThat(refused(() -> orders.get(1L))).isTrue();
+        assertThat(refused(() -> orders.get(1L, authentication()))).isTrue();
         anonymous();
-        assertThat(refused(() -> orders.get(1L))).isTrue();
+        assertThat(refused(() -> orders.get(1L, authentication()))).isTrue();
     }
 
     @Test
     void o7_listingOrdersNeedsARole() {
         customer();
-        assertThat(refused(() -> orders.list(null))).isFalse();
+        assertThat(refused(() -> orders.list(null, authentication()))).isFalse();
         admin();
-        assertThat(refused(() -> orders.list(null))).isFalse();
+        assertThat(refused(() -> orders.list(null, authentication()))).isFalse();
         userWithoutRole();
-        assertThat(refused(() -> orders.list(null))).isTrue();
+        assertThat(refused(() -> orders.list(null, authentication()))).isTrue();
         anonymous();
-        assertThat(refused(() -> orders.list(null))).isTrue();
+        assertThat(refused(() -> orders.list(null, authentication()))).isTrue();
     }
 }
