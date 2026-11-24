@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.user.exception;
 
+import ma.ensias.ecommerce.user.security.audit.AuditLog;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
@@ -168,11 +169,13 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
+        AuditLog.deny(request, AuditLog.denialReasonOf(request));
         return build(HttpStatus.FORBIDDEN, "Access denied", request, List.of());
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiError> handleAuthentication(AuthenticationException ex, HttpServletRequest request) {
+        AuditLog.deny(request, AuditLog.MISSING_TOKEN);
         return build(HttpStatus.UNAUTHORIZED, "Authentication required", request, List.of());
     }
 

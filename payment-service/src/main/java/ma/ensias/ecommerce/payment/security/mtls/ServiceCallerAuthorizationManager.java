@@ -1,8 +1,7 @@
 package ma.ensias.ecommerce.payment.security.mtls;
 
+import ma.ensias.ecommerce.payment.security.audit.AuditLog;
 import jakarta.servlet.http.HttpServletRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.AuthorizationManager;
@@ -28,12 +27,11 @@ import java.util.function.Supplier;
  * It is applied by Spring Security's authorization layer, and it FAILS CLOSED: if the filter did not run, or recorded
  * nothing usable, the caller counts as "no certificate" and the request is refused.
  * <p>
- * A refusal records its {@link DenialReason} on the request and is logged at WARN with the reason code, the method,
- * the path and the caller (the CN may be logged; nothing else about the certificate, no header, no body).
+ * A refusal records its {@link DenialReason} on the request and is written to the audit trail (see
+ * {@link AuditLog}): the reason code, the method, the path and the CN of the caller, nothing else.
  */
 public final class ServiceCallerAuthorizationManager implements AuthorizationManager<RequestAuthorizationContext> {
 
-    private static final Logger log = LoggerFactory.getLogger(ServiceCallerAuthorizationManager.class);
 
     private final Set<ServiceIdentity> allowedServices;
 
@@ -75,8 +73,7 @@ public final class ServiceCallerAuthorizationManager implements AuthorizationMan
 
     private static AuthorizationDecision refuse(HttpServletRequest request, DenialReason reason, CallerIdentity caller) {
         request.setAttribute(DenialReason.REQUEST_ATTRIBUTE, reason);
-        log.warn("Access refused: reason={}, method={}, path={}, caller={}", reason.code(), request.getMethod(),
-                request.getRequestURI(), caller);
+        AuditLog.deny(request, reason.code());
         return new AuthorizationDecision(false);
     }
 }

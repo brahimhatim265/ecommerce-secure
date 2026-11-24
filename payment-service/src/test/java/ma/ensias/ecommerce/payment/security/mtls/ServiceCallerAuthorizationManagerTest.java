@@ -27,7 +27,7 @@ class ServiceCallerAuthorizationManagerTest {
             ServiceCallerAuthorizationManager.onlyFromOnBehalfOfAUser(ServiceIdentity.SERVICE_ORDER);
 
     private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
-    private final Logger managerLogger = (Logger) LoggerFactory.getLogger(ServiceCallerAuthorizationManager.class);
+    private final Logger managerLogger = (Logger) LoggerFactory.getLogger("AUDIT");
 
     private static final Supplier<Authentication> A_USER =
             () -> new TestingAuthenticationToken("someone", "n/a", "ROLE_CUSTOMER");

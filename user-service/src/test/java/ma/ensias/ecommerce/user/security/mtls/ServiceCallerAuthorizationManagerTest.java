@@ -21,7 +21,7 @@ class ServiceCallerAuthorizationManagerTest {
             ServiceCallerAuthorizationManager.onlyFrom(ServiceIdentity.SERVICE_AUTH);
 
     private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
-    private final Logger managerLogger = (Logger) LoggerFactory.getLogger(ServiceCallerAuthorizationManager.class);
+    private final Logger managerLogger = (Logger) LoggerFactory.getLogger("AUDIT");
 
     @BeforeEach
     void captureLogs() {
