@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.user.security;
 
+import ma.ensias.ecommerce.user.security.audit.AuditLog;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -59,7 +60,12 @@ public class AccessRules {
 
     /** True when the user of the token is the owner of the resource (their {@code sub} equals {@code ownerId}). */
     public boolean isOwner(Authentication authentication, UUID ownerId) {
-        return ownerId != null && subjectOf(authentication).map(ownerId::equals).orElse(false);
+        Optional<UUID> subject = subjectOf(authentication);
+        boolean owner = ownerId != null && subject.map(ownerId::equals).orElse(false);
+        if (!owner && ownerId != null && subject.isPresent()) {
+            AuditLog.hintNotOwner(); // only a note for the audit trail: a refusal that follows is "not_owner"
+        }
+        return owner;
     }
 
     /** True for the owner of the resource, and for any administrator. */
@@ -79,6 +85,7 @@ public class AccessRules {
         UUID subject = subjectOf(authentication)
                 .orElseThrow(() -> new AccessDeniedException("No user identity"));
         if (requestedOwnerId != null && !requestedOwnerId.equals(subject)) {
+            AuditLog.hintNotOwner();
             throw new AccessDeniedException("A user can only list their own resources");
         }
         return subject;

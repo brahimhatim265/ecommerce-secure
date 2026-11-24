@@ -1,5 +1,6 @@
 package ma.ensias.ecommerce.payment.exception;
 
+import ma.ensias.ecommerce.payment.security.audit.AuditLog;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
@@ -110,6 +111,13 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, ex.getMessage(), request, List.of());
     }
 
+    /** Someone else's resource: the same 404 as a missing one, but the audit trail keeps the real reason. */
+    @ExceptionHandler(NotOwnerException.class)
+    public ResponseEntity<ApiError> handleNotOwner(NotOwnerException ex, HttpServletRequest request) {
+        AuditLog.deny(request, AuditLog.NOT_OWNER);
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
+    }
+
     @ExceptionHandler({ResourceNotFoundException.class, NoResourceFoundException.class})
     public ResponseEntity<ApiError> handleNotFound(Exception ex, HttpServletRequest request) {
         String message = ex instanceof ResourceNotFoundException ? ex.getMessage() : "Resource not found";
@@ -167,11 +175,13 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
+        AuditLog.deny(request, AuditLog.denialReasonOf(request));
         return build(HttpStatus.FORBIDDEN, "Access denied", request, List.of());
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiError> handleAuthentication(AuthenticationException ex, HttpServletRequest request) {
+        AuditLog.deny(request, AuditLog.MISSING_TOKEN);
         return build(HttpStatus.UNAUTHORIZED, "Authentication required", request, List.of());
     }
 
