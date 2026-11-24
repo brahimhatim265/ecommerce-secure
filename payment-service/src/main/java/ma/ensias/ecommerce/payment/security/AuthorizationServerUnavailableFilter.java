@@ -13,13 +13,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * Turns "the token could not be checked because the authorization server is unreachable" into a clean
- * 503 ApiError. Without it, that failure escapes the filter chain, goes through the container's error dispatch and
- * is reported as a misleading 401 on the path "/error", as if the token itself were wrong.
- * <p>
- * Registered by SecurityConfig inside the security filter chain (it is deliberately not a bean).
- */
+
 public class AuthorizationServerUnavailableFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(AuthorizationServerUnavailableFilter.class);

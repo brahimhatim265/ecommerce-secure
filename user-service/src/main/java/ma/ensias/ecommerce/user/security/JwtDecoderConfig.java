@@ -31,11 +31,7 @@ public class JwtDecoderConfig {
         return lazyDecoder(issuerUri, sslBundles.getBundle(SSL_BUNDLE_NAME));
     }
 
-    /**
-     * Lazy decoder: the authorization server is contacted on the first authenticated request, not at startup.
-     * The OIDC metadata and the signing keys (JWKS) are fetched over HTTPS by a client that trusts the project CA
-     * (truststore of the SSL bundle) and verifies the host name; a certificate from any other CA is refused.
-     */
+
     static JwtDecoder lazyDecoder(String issuerUri, SslBundle sslBundle) {
         RestOperations rest = httpsRestOperations(sslBundle);
         return new SupplierJwtDecoder(() -> {

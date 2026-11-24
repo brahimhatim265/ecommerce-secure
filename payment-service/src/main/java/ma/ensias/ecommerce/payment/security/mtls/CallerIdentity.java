@@ -2,17 +2,7 @@ package ma.ensias.ecommerce.payment.security.mtls;
 
 import java.util.Optional;
 
-/**
- * Who is calling, as far as the client certificate says. Exactly one of three situations, so that the authorization
- * rules can tell them apart (no certificate gives a 401, a certificate that is not allowed gives a 403):
- * <ul>
- *   <li>{@link Type#SERVICE}: the certificate carries the CN of a project service (see {@link ServiceIdentity});</li>
- *   <li>{@link Type#UNKNOWN_SERVICE}: a certificate was presented (so it is signed by the project CA) but its CN is
- *       not in the table, or it has no single usable CN: the caller has NO right;</li>
- *   <li>{@link Type#NO_CERTIFICATE}: no client certificate was presented (browser, Postman, client web...).</li>
- * </ul>
- * It is a plain description: it never grants anything by itself.
- */
+
 public final class CallerIdentity {
 
     /** Name of the request attribute under which {@link ClientCertificateFilter} stores the identity. */

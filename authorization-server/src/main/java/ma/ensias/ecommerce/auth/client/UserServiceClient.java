@@ -14,10 +14,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
-/**
- * Calls user-service POST /internal/auth/verify and translates the outcome into Spring Security exceptions.
- * Fails closed: anything other than a complete 200 answer is an authentication failure.
- */
+
 @Component
 public class UserServiceClient {
 
@@ -29,12 +26,6 @@ public class UserServiceClient {
         this.restClient = restClient;
     }
 
-    /**
-     * @return the verified identity (200)
-     * @throws BadCredentialsException       on 401
-     * @throws DisabledException             on 403
-     * @throws AuthenticationServiceException on any technical problem (timeout, unreachable, 4xx/5xx, bad body)
-     */
     public VerifiedIdentity verify(String email, String password) {
         VerifiedIdentity identity;
         try {

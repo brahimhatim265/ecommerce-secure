@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 
-/** Writes the project's {@link ApiError} JSON for errors raised by the security filter chain. */
 @Component
 public class ApiErrorWriter {
 

@@ -1,26 +1,13 @@
-# Authorization server, step 3.
-# WARNING: the JWT signing keys are generated IN MEMORY at startup.
-# They change at every restart: tokens issued before a restart become invalid.
-#
-# Users are authenticated by user-service (see UserServiceAuthenticationProvider):
-# this server has no user store of its own.
-
 server:
   port: 9000
   ssl:
-    # HTTPS only: there is no HTTP connector. The client certificate is requested but NOT required ("want"),
-    # so public and JWT-authenticated endpoints stay reachable without one. Never use "need".
-    # Whatever certificate IS presented must be signed by the project CA, otherwise the handshake fails.
     bundle: mtls
     client-auth: want
 
 spring:
   application:
     name: authorization-server
-  # TLS material (step 7): one bundle named "mtls", used by the HTTPS server.
-  # DEMONSTRATION ONLY: the default password below is public. Override it with PKI_PASSWORD.
-  # Paths default to the classpath and can be overridden (AUTHORIZATION_SERVER_KEYSTORE_LOCATION / PKI_TRUSTSTORE_LOCATION,
-  # e.g. file:/path/to/keystore.p12).
+
   ssl:
     bundle:
       jks:
@@ -40,10 +27,8 @@ spring:
   security:
     oauth2:
       authorizationserver:
-        # Fixed issuer: every service must trust exactly this value (localhost != 127.0.0.1).
         issuer: https://localhost:9000
         client:
-          # Public client (the future web shop): no secret, Authorization Code + PKCE only.
           ecommerce-web:
             registration:
               client-id: ecommerce-web
@@ -52,7 +37,6 @@ spring:
                 - none
               authorization-grant-types:
                 - authorization_code
-              # Redirect URIs must match EXACTLY. 127.0.0.1 is used on purpose (not localhost).
               redirect-uris:
                 - http://127.0.0.1:8080/authorized
                 - https://oauth.pstmn.io/v1/callback
@@ -60,9 +44,7 @@ spring:
                 - openid
                 - profile
                 - email
-            # PKCE is mandatory for this public client.
             require-proof-key: true
-            # First-party application: no consent screen shown to the user.
             require-authorization-consent: false
             token:
               access-token-time-to-live: PT15M

@@ -14,16 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Set;
 
-/**
- * Adds the project's claims to the issued JWTs, using only the authenticated principal
- * (no call to user-service). The contract is documented in {@code docs/contrat-jwt.md}.
- * <ul>
- *   <li>{@code email}: access token and ID token, only if the {@code email} scope is granted;</li>
- *   <li>{@code name}: access token and ID token, only if the {@code profile} scope is granted;</li>
- *   <li>{@code roles}: access token only, always present (without the {@code ROLE_} prefix).</li>
- * </ul>
- * If the principal is not an {@link AuthenticatedUser}, nothing is added and an error is logged.
- */
+
 @Component
 public class TokenClaimsCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 

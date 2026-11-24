@@ -13,17 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Reads the client certificate of a request and the common name (CN) of its subject.
- * <p>
- * The certificate comes from the standard Servlet attribute published by the container, never from a header, so a
- * client cannot forge it. By the time it is there, the TLS handshake has already validated it (chain, dates) against
- * the project CA.
- * <p>
- * The CN is read with the JDK LDAP API ({@link LdapName}/{@link Rdn}), not with a regular expression: escaped
- * characters are decoded and an attribute type such as "OU" can never be mistaken for a CN. Every doubtful case
- * gives NO name, which means NO identity and NO right.
- */
+
 public final class ClientCertificateParser {
 
     /** Standard Servlet attribute holding the certificate chain presented by the client, leaf first. */
@@ -39,10 +29,7 @@ public final class ClientCertificateParser {
         return Optional.empty();
     }
 
-    /**
-     * The CN of the subject, or empty when it is absent, appears more than once (ambiguous), is not text, or when
-     * the subject cannot be parsed. This method never throws on a malformed subject.
-     */
+
     public Optional<String> commonName(X509Certificate certificate) {
         List<String> commonNames = new ArrayList<>();
         try {

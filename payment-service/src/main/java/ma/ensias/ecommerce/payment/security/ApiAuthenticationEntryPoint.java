@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
-/** 401 in the ApiError format. The message never reveals why a token was refused. */
 @Component
 public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
 

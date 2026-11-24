@@ -1,19 +1,12 @@
 server:
   port: 8083
   ssl:
-    # HTTPS only: there is no HTTP connector. The client certificate is requested but NOT required ("want"),
-    # so public and JWT-authenticated endpoints stay reachable without one. Never use "need".
-    # Whatever certificate IS presented must be signed by the project CA, otherwise the handshake fails.
     bundle: mtls
     client-auth: want
 
 spring:
   application:
     name: payment-service
-  # TLS material (step 7): one bundle named "mtls", used by the HTTPS server.
-  # DEMONSTRATION ONLY: the default password below is public. Override it with PKI_PASSWORD.
-  # Paths default to the classpath and can be overridden (PAYMENT_SERVICE_KEYSTORE_LOCATION / PKI_TRUSTSTORE_LOCATION,
-  # e.g. file:/path/to/keystore.p12).
   ssl:
     bundle:
       jks:

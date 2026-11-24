@@ -18,7 +18,6 @@ import java.time.Duration;
 @Configuration
 public class JwtDecoderConfig {
 
-    /** The SSL bundle declared in application.yml: its truststore holds the project CA. */
     static final String SSL_BUNDLE_NAME = "mtls";
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
@@ -31,11 +30,7 @@ public class JwtDecoderConfig {
         return lazyDecoder(issuerUri, sslBundles.getBundle(SSL_BUNDLE_NAME));
     }
 
-    /**
-     * Lazy decoder: the authorization server is contacted on the first authenticated request, not at startup.
-     * The OIDC metadata and the signing keys (JWKS) are fetched over HTTPS by a client that trusts the project CA
-     * (truststore of the SSL bundle) and verifies the host name; a certificate from any other CA is refused.
-     */
+
     static JwtDecoder lazyDecoder(String issuerUri, SslBundle sslBundle) {
         RestOperations rest = httpsRestOperations(sslBundle);
         return new SupplierJwtDecoder(() -> {
@@ -45,7 +40,6 @@ public class JwtDecoderConfig {
         });
     }
 
-    /** The JDK HTTP client is used on purpose: it applies the protocols of the bundle (the simple one refuses them). */
     private static RestOperations httpsRestOperations(SslBundle sslBundle) {
         ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.defaults()
                 .withTimeouts(CONNECT_TIMEOUT, READ_TIMEOUT)

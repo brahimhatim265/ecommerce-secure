@@ -1,6 +1,5 @@
 package ma.ensias.ecommerce.auth.security;
 
-/** Masks an email address before it is written to a log. */
 public final class EmailMasker {
 
     private static final String MASK = "***";

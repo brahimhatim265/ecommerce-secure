@@ -10,13 +10,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 
 import java.io.IOException;
 
-/**
- * Forwards the JWT of the request being served to every outgoing call, so that user-service and payment-service
- * can validate it themselves.
- * <p>
- * Fails closed: without a JWT in the security context the call is NOT sent (never an anonymous call).
- * The token is never logged, and never written in an exception message.
- */
+
 public class BearerTokenRelayInterceptor implements ClientHttpRequestInterceptor {
 
     @Override

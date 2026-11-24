@@ -10,12 +10,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * The authenticated person, as verified by user-service.
- * <p>
- * {@link #getUsername()} returns the user's UUID as text on purpose: the principal name becomes the
- * {@code sub} claim of the issued tokens. There is no password here: the hash never leaves user-service.
- */
+
 public record AuthenticatedUser(UUID id, String email, String firstName, String lastName, Set<String> roles)
         implements UserDetails {
 

@@ -13,14 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.DisabledException;
 
-/**
- * Authenticates the login form (email + password) by asking user-service.
- * <p>
- * It never compares a password or a hash itself and never keeps the password: the authenticated token it
- * returns carries no credentials. Outcomes (see {@link UserServiceClient}): 200 = success,
- * 401 = BadCredentialsException, 403 = DisabledException, technical failure = AuthenticationServiceException.
- * Every failure is logged at WARN with a masked email and the internal reason, never a secret.
- */
+
 @Component
 public class UserServiceAuthenticationProvider implements AuthenticationProvider {
 
@@ -40,13 +33,11 @@ public class UserServiceAuthenticationProvider implements AuthenticationProvider
         try {
             return verifyAndBuildToken(authentication, email);
         } catch (AuthenticationException e) {
-            // The messages of these exceptions are written by this application: no password, no raw response.
             log.warn("Login failed for {}: {}", EmailMasker.mask(email), e.getMessage());
             throw userFacing(e);
         }
     }
 
-    /** The message of the thrown exception reaches the login page: it must never reveal why the login failed. */
     private static AuthenticationException userFacing(AuthenticationException e) {
         if (e instanceof BadCredentialsException) {
             return e; // its message is already the generic "Invalid credentials"

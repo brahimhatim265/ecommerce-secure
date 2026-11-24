@@ -27,12 +27,7 @@ public class UserClient {
         this.restClient = restClient;
     }
 
-    /**
-     * Fetches a user by id.
-     *
-     * @throws ResourceNotFoundException if user-service answers 404
-     * @throws ExternalServiceException  if user-service is unreachable, too slow or fails
-     */
+
     public UserSummary getUser(UUID id) {
         try {
             UserSummary user = restClient.get().uri("/users/{id}", id).retrieve().body(UserSummary.class);

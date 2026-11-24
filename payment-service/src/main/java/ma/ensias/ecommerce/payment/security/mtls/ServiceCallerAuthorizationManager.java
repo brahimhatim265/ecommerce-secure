@@ -12,24 +12,7 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.function.Supplier;
 
-/**
- * The authorization rule of an endpoint reserved to some project services ACTING ON BEHALF OF A USER: the request is
- * granted only when
- * <ol>
- *   <li>the client presented a certificate, and</li>
- *   <li>the caller identified from it (see {@link ClientCertificateFilter}) is one of the allowed services, and</li>
- *   <li>an authenticated user is present: the JWT relayed by the calling service, already validated by Spring
- *       Security before this rule runs (a missing, invalid or expired token never gets here: it is a 401 earlier).</li>
- * </ol>
- * The two identities stay separate: the service comes from the certificate, the user from the JWT. The checks are made
- * in this order, so a service that is not allowed gets a 403 whether or not it sent a token.
- * <p>
- * It is applied by Spring Security's authorization layer, and it FAILS CLOSED: if the filter did not run, or recorded
- * nothing usable, the caller counts as "no certificate" and the request is refused.
- * <p>
- * A refusal records its {@link DenialReason} on the request and is written to the audit trail (see
- * {@link AuditLog}): the reason code, the method, the path and the CN of the caller, nothing else.
- */
+
 public final class ServiceCallerAuthorizationManager implements AuthorizationManager<RequestAuthorizationContext> {
 
 

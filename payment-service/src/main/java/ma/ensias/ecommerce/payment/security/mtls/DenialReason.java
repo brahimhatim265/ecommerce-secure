@@ -5,14 +5,7 @@ import org.springframework.http.HttpStatus;
 
 import java.util.Optional;
 
-/**
- * Why {@link ServiceCallerAuthorizationManager} refused a request, and the HTTP status that goes with it.
- * <p>
- * Spring Security answers 401 to EVERY refused request of an anonymous caller (and it does not tell the 401 handler why
- * the request was refused). The rule therefore records its reason on the request, and
- * {@link ServiceRuleDeniedHandler} reads it back to answer 401 or 403 as required. The {@link #code()} is what is
- * written to the log; the client only ever receives a generic message.
- */
+
 public enum DenialReason {
 
     /** No client certificate was presented: 401. */

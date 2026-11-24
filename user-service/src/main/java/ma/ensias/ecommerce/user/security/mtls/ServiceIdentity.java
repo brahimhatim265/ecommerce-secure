@@ -2,15 +2,7 @@ package ma.ensias.ecommerce.user.security.mtls;
 
 import java.util.Optional;
 
-/**
- * The identity of a project service, derived from the common name (CN) of its client certificate.
- * <p>
- * This enum IS the correspondence table: exactly four entries, matched EXACTLY (case-sensitive, no trimming, no
- * pattern). A CN that is not in the table has no identity and therefore no right.
- * <p>
- * The CN is only a name. What makes it trustworthy is that the TLS handshake has already validated the certificate
- * chain against the project CA (truststore of the SSL bundle) before the application ever sees the request.
- */
+
 public enum ServiceIdentity {
 
     SERVICE_USER("user-service"),

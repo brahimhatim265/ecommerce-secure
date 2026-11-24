@@ -12,15 +12,7 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 
 import java.io.IOException;
 
-/**
- * Answers the requests refused by {@link ServiceCallerAuthorizationManager} with the status that goes with the
- * {@link DenialReason}: 401 when no certificate was presented, 403 when it was but may not call the endpoint. The
- * body is always the generic ApiError of the existing handlers.
- * <p>
- * It serves as the entry point (anonymous caller) AND as the access denied handler (caller with a token), because
- * Spring Security picks one or the other from the caller, whereas the status here depends only on the reason.
- * Every refusal that did NOT come from the service rule is passed on, unchanged, to the existing handlers.
- */
+
 public final class ServiceRuleDeniedHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
 
     private final AuthenticationEntryPoint unauthorized;

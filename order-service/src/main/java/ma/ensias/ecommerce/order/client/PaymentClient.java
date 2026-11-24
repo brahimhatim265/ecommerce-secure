@@ -19,10 +19,7 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 
-/**
- * Calls payment-service. When no HTTP response is received (I/O error or timeout) the call is retried ONCE with
- * the same Idempotency-Key, which payment-service makes safe. No retry on a received HTTP response.
- */
+
 @Component
 public class PaymentClient {
 
@@ -39,12 +36,7 @@ public class PaymentClient {
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * Creates a payment (201) or replays it (200).
-     *
-     * @throws InvalidRequestException  if payment-service answers 400 (the original message is kept)
-     * @throws ExternalServiceException on timeout, unreachable service, other 4xx or 5xx, unreadable answer
-     */
+
     public PaymentResult createPayment(PaymentRequest request, String idempotencyKey) {
         try {
             return postWithSingleRetry(request, idempotencyKey);

@@ -10,24 +10,7 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * The bean "access": the ownership (ABAC) and role rules that the authorization expressions use, for example
- * {@code @PreAuthorize("@access.isOwnerOrAdmin(authentication, #id)")}.
- * <p>
- * Contract, identical in the three services:
- * <ul>
- *   <li>the identity of the USER is the claim {@code sub} of the validated JWT, read as a UUID. Anything else
- *       (no authentication, anonymous, an authentication that is not a JWT, a {@code sub} that is not a UUID) gives
- *       NO identity;</li>
- *   <li>every method FAILS CLOSED: with no identity, a null argument or any doubt, the answer is {@code false};
- *       the predicates never throw ({@link #ownerFilterFor} refuses by throwing);</li>
- *   <li>{@link #isAdmin} reads the authority {@code ROLE_ADMIN} built from the claim {@code roles};</li>
- *   <li>none of these methods says anything about the calling SERVICE (certificate): that is the bean
- *       "callers". A rule that needs both writes both.</li>
- * </ul>
- * An administrator is NOT the owner of everything: {@link #isOwner} stays false for an administrator who does not own
- * the resource. {@link #isOwnerOrAdmin} is the rule that lets an administrator through.
- */
+
 @Component("access")
 public class AccessRules {
 
@@ -73,11 +56,6 @@ public class AccessRules {
         return isAdmin(authentication) || isOwner(authentication, ownerId);
     }
 
-    /**
-     * The owner that a list must be filtered on. An administrator gets what they asked for ({@code null} means
-     * everyone). Anyone else always gets THEIR OWN identity: asking for another owner is refused, and so is a caller
-     * without identity. This is the only method of the class that throws, because a list has no "false" to answer.
-     */
     public UUID ownerFilterFor(Authentication authentication, UUID requestedOwnerId) {
         if (isAdmin(authentication)) {
             return requestedOwnerId;

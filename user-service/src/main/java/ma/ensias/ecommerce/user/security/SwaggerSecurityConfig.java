@@ -10,10 +10,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
-/**
- * Makes Swagger UI and the OpenAPI definition public, and ONLY when springdoc is enabled (profile "demo").
- * Without the demo profile this chain does not exist, and these URLs fall under the main chain (token required).
- */
+
 @Configuration
 @ConditionalOnProperty(name = "springdoc.swagger-ui.enabled", havingValue = "true")
 public class SwaggerSecurityConfig {

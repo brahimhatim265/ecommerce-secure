@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
-/** 403 in the ApiError format (minimal version; the authorization rules are added later). */
 @Component
 public class ApiAccessDeniedHandler implements AccessDeniedHandler {
 
